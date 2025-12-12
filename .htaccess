@@ -1,0 +1,68 @@
+# Configuración Apache para SDI Gestión Documental
+# Compatible con InfinityFree
+
+# Habilitar motor de reescritura
+RewriteEngine On
+
+# Proteger archivos sensibles
+<FilesMatch "\.(htaccess|htpasswd|ini|log|sh|sql)$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>
+
+# Proteger directorio config
+<DirectoryMatch "^.*/config/">
+    Order Allow,Deny
+    Deny from all
+</DirectoryMatch>
+
+# Proteger directorio helpers
+<DirectoryMatch "^.*/helpers/">
+    Order Allow,Deny
+    Deny from all
+</DirectoryMatch>
+
+# Proteger directorio models
+<DirectoryMatch "^.*/models/">
+    Order Allow,Deny
+    Deny from all
+</DirectoryMatch>
+
+# Proteger directorio controllers
+<DirectoryMatch "^.*/controllers/">
+    Order Allow,Deny
+    Deny from all
+</DirectoryMatch>
+
+# Proteger directorio database (excepto crear_admin.php si es necesario)
+# NOTA: Comentar temporalmente esta sección para ejecutar crear_admin.php
+<DirectoryMatch "^.*/database/">
+    <FilesMatch "^(?!crear_admin\.php).*$">
+        Order Allow,Deny
+        Deny from all
+    </FilesMatch>
+</DirectoryMatch>
+
+# Prevenir listado de directorios
+Options -Indexes
+
+# Configuración de PHP (si está permitido)
+<IfModule mod_php7.c>
+    php_value upload_max_filesize 5M
+    php_value post_max_size 5M
+    php_value max_execution_time 30
+    php_value max_input_time 30
+</IfModule>
+
+# Headers de seguridad
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set X-XSS-Protection "1; mode=block"
+</IfModule>
+
+# Compresión GZIP (si está disponible)
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css text/javascript application/javascript application/json
+</IfModule>
+

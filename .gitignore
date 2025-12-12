@@ -1,0 +1,25 @@
+# Archivos de configuración sensibles
+config/db.php
+
+# Archivos subidos
+public/uploads/*
+!public/uploads/.gitkeep
+
+# Logs
+*.log
+
+# Archivos temporales
+*.tmp
+*.cache
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+Requerimientos y logica de negocio-SDI.pdf
