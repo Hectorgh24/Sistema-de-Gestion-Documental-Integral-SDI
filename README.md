@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # SDI Gestión Documental
 
 Sistema de gestión documental desarrollado para entorno de hosting compartido (InfinityFree).
@@ -72,3 +73,6 @@ https://tu-dominio.com/VERIFICACION_INSTALACION.php?token=verificar123
 
 Propietario - Todos los derechos reservados
 
+=======
+# Sistema-SDI
+>>>>>>> 8e7a89e4349b460b5231e3b2cbb9d41fa210255e
