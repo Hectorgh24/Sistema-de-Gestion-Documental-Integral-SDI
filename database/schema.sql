@@ -2,8 +2,6 @@
 -- Script SQL Definitivo - Compatible con MySQL/InfinityFree
 -- IMPORTANTE: Esta es la estructura DEFINITIVA. No modificar sin autorización.
 
-CREATE DATABASE IF NOT EXISTS SDI_Gestion_Documental CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE SDI_Gestion_Documental;
 
 -- MÓDULO DE SEGURIDAD
 CREATE TABLE roles (
