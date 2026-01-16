@@ -413,12 +413,29 @@ const archivoGeneralModule = {
      */
     async crearCarpeta(formData) {
         try {
+            // Obtener valores del formulario
+            const titulo = (formData.get('titulo') || '').trim();
+            const etiqueta = (formData.get('etiqueta_identificadora') || '').trim();
+            const descripcion = (formData.get('descripcion') || '').trim();
+            const estado = (formData.get('estado_gestion') || 'pendiente').trim();
+            const noCarpeta = parseInt(formData.get('no_carpeta_fisica'));
+
+            // Validar que los campos requeridos no estén vacíos
+            if (!titulo) {
+                ui.toast('El título es requerido', 'error');
+                return;
+            }
+            if (!etiqueta) {
+                ui.toast('La etiqueta es requerida', 'error');
+                return;
+            }
+
             const datos = {
-                no_carpeta_fisica: formData.get('no_carpeta_fisica'),
-                titulo: formData.get('titulo'),
-                etiqueta_identificadora: formData.get('etiqueta_identificadora'),
-                descripcion: formData.get('descripcion'),
-                estado_gestion: formData.get('estado_gestion') || 'pendiente'
+                no_carpeta_fisica: noCarpeta,
+                titulo: titulo,
+                etiqueta_identificadora: etiqueta,
+                descripcion: descripcion,
+                estado_gestion: estado
             };
 
             console.log('📝 Creando carpeta con datos:', datos);
@@ -428,7 +445,7 @@ const archivoGeneralModule = {
             console.log('✅ Respuesta del servidor:', resultado);
 
             if (resultado.success) {
-                ui.toast('Carpeta creada exitosamente', 'success');
+                ui.toast('✓ Carpeta creada exitosamente', 'success');
                 
                 // Recargar carpetas
                 await this.cargarCarpetas();
@@ -439,8 +456,6 @@ const archivoGeneralModule = {
                 if (tablaCarpetas) {
                     tablaCarpetas.innerHTML = await this.renderizarTablaCarpetas();
                     console.log('✏️ Tabla actualizada');
-                } else {
-                    console.warn('⚠️ Tabla no encontrada en DOM');
                 }
 
                 // Actualizar total
@@ -453,10 +468,6 @@ const archivoGeneralModule = {
                 const form = document.getElementById('formCarpeta');
                 if (form) {
                     form.reset();
-                    // Actualizar el display del campo no_carpeta_fisica
-                    setTimeout(() => {
-                        document.querySelector('.no_carpeta_display').textContent = this.carpetas.length + 1;
-                    }, 100);
                 }
             } else {
                 console.error('❌ Error en respuesta:', resultado);
@@ -464,7 +475,7 @@ const archivoGeneralModule = {
             }
         } catch (error) {
             console.error('❌ Error creando carpeta:', error);
-            ui.toast('Error al crear la carpeta: ' + error.message, 'error');
+            ui.toast('Error: ' + (error.message || 'Error al crear la carpeta'), 'error');
         }
     },
 
@@ -472,12 +483,22 @@ const archivoGeneralModule = {
      * Validar que el título no se repita
      */
     validarTitulo(valor) {
+        if (!valor || !valor.trim()) {
+            const error = document.getElementById('errorTitulo');
+            if (error) error.classList.add('hidden');
+            return;
+        }
+
         const error = document.getElementById('errorTitulo');
         const mensaje = document.getElementById('mensajeTitulo');
         
-        const existe = this.carpetas.some(c => c.titulo.toLowerCase() === valor.toLowerCase());
+        if (!error || !mensaje) return; // Elementos no existen aún
         
-        if (existe && valor) {
+        const existe = this.carpetas.some(c => 
+            c.titulo && c.titulo.toLowerCase() === valor.toLowerCase()
+        );
+        
+        if (existe) {
             error.classList.remove('hidden');
             mensaje.textContent = 'El título ya existe en otra carpeta';
         } else {
@@ -489,12 +510,22 @@ const archivoGeneralModule = {
      * Validar que la etiqueta no se repita
      */
     validarEtiqueta(valor) {
+        if (!valor || !valor.trim()) {
+            const error = document.getElementById('errorEtiqueta');
+            if (error) error.classList.add('hidden');
+            return;
+        }
+
         const error = document.getElementById('errorEtiqueta');
         const mensaje = document.getElementById('mensajeEtiqueta');
         
-        const existe = this.carpetas.some(c => c.etiqueta_identificadora.toLowerCase() === valor.toLowerCase());
+        if (!error || !mensaje) return; // Elementos no existen aún
+
+        const existe = this.carpetas.some(c => 
+            c.etiqueta_identificadora && c.etiqueta_identificadora.toLowerCase() === valor.toLowerCase()
+        );
         
-        if (existe && valor) {
+        if (existe) {
             error.classList.remove('hidden');
             mensaje.textContent = 'La etiqueta ya existe en otra carpeta';
         } else {
@@ -989,32 +1020,36 @@ const archivoGeneralModule = {
         event.preventDefault();
 
         try {
-            const titulo = document.getElementById('edit_titulo').value.trim();
-            const etiqueta = document.getElementById('edit_etiqueta').value.trim();
-            const estado = document.getElementById('edit_estado').value;
-            const descripcion = document.getElementById('edit_descripcion').value.trim();
+            const titulo = (document.getElementById('edit_titulo')?.value || '').trim();
+            const etiqueta = (document.getElementById('edit_etiqueta')?.value || '').trim();
+            const estado = document.getElementById('edit_estado')?.value || 'pendiente';
+            const descripcion = (document.getElementById('edit_descripcion')?.value || '').trim();
+
+            // Validar campos requeridos
+            if (!titulo) {
+                ui.toast('El título es requerido', 'error');
+                return;
+            }
+            if (!etiqueta) {
+                ui.toast('La etiqueta es requerida', 'error');
+                return;
+            }
 
             // Validar que el título no exista en otra carpeta
             const existeTitulo = this.carpetas.some(c => 
-                c.id_carpeta !== id && c.titulo.toLowerCase() === titulo.toLowerCase()
+                c.id_carpeta !== id && c.titulo && c.titulo.toLowerCase() === titulo.toLowerCase()
             );
             if (existeTitulo) {
-                const errorTitulo = document.getElementById('editErrorTitulo');
-                const mensajeTitulo = document.getElementById('editMensajeTitulo');
-                errorTitulo.classList.remove('hidden');
-                mensajeTitulo.textContent = 'El título ya existe en otra carpeta';
+                ui.toast('El título ya existe en otra carpeta', 'error');
                 return;
             }
 
             // Validar que la etiqueta no exista en otra carpeta
             const existeEtiqueta = this.carpetas.some(c => 
-                c.id_carpeta !== id && c.etiqueta_identificadora.toLowerCase() === etiqueta.toLowerCase()
+                c.id_carpeta !== id && c.etiqueta_identificadora && c.etiqueta_identificadora.toLowerCase() === etiqueta.toLowerCase()
             );
             if (existeEtiqueta) {
-                const errorEtiqueta = document.getElementById('editErrorEtiqueta');
-                const mensajeEtiqueta = document.getElementById('editMensajeEtiqueta');
-                errorEtiqueta.classList.remove('hidden');
-                mensajeEtiqueta.textContent = 'La etiqueta ya existe en otra carpeta';
+                ui.toast('La etiqueta ya existe en otra carpeta', 'error');
                 return;
             }
 
@@ -1025,10 +1060,12 @@ const archivoGeneralModule = {
                 estado_gestion: estado
             };
 
+            console.log('🔄 Actualizando carpeta:', id, datos);
+
             const resultado = await api.put(`/carpetas/${id}`, datos);
 
             if (resultado.success) {
-                ui.toast('Carpeta actualizada correctamente', 'success');
+                ui.toast('✓ Carpeta actualizada correctamente', 'success');
                 this.cerrarModal();
                 
                 // Recargar carpetas
@@ -1050,7 +1087,7 @@ const archivoGeneralModule = {
             }
         } catch (error) {
             console.error('Error guardando carpeta:', error);
-            ui.toast('Error al guardar cambios', 'error');
+            ui.toast('Error: ' + (error.message || 'Error al guardar cambios'), 'error');
         }
     },
 
