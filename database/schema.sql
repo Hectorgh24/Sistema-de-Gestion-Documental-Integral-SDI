@@ -1,6 +1,6 @@
 -- ======================================================================================
--- ESQUEMA DE BASE DE DATOS: SDI_Gestion_Documental_v3 (Strict 3NF)
--- Fecha: 2024
+-- ESQUEMA DE BASE DE DATOS: sdi_gestion_documental (Strict 3NF)
+-- Fecha: 2024 | Actualizado: Enero 2026
 -- Motor: MySQL / MariaDB (InnoDB)
 -- ======================================================================================
 
@@ -165,10 +165,11 @@ INSERT INTO roles (nombre_rol, descripcion) VALUES
 ('Estudiante SS', 'Permisos de captura de documentos y consulta básica'),
 ('Personal Administrativo', 'Gestión de carpetas, reportes y supervisión');
 
--- 5.2 Usuario Admin (Ejemplo con nombre atomizado)
--- Password dummy, en producción usar BCRYPT o ARGON2
+-- 5.2 Usuario Admin
+-- Email: hectorggh24@gmail.com
+-- Password: password
 INSERT INTO usuarios (id_rol, nombre, apellido_paterno, apellido_materno, email, password_hash) VALUES
-(1, 'Héctor', 'González', 'Hernández', 'admin@sdi.com', 'hashed_secret_password_123');
+(1, 'Héctor', 'González', 'Hernández', 'hectorggh24@gmail.com', '$2y$10$q7p3aTolsz9/BVdhgPsZ7.18nv2dJXFNpba/eGVYFmlouYzCHSG3a');
 
 -- 5.3 Categoría Base: Auditoría
 INSERT INTO cat_categorias (nombre_categoria, descripcion) VALUES 
