@@ -142,26 +142,43 @@ const archivoGeneralModule = {
     },
 
     /**
+     * Obtener siguiente número de carpeta
+     */
+    obtenerSiguienteNoCarpeta() {
+        if (this.carpetas.length === 0) {
+            return 1;
+        }
+        
+        // Encontrar el número máximo
+        const numeros = this.carpetas.map(c => parseInt(c.no_carpeta_fisica) || 0);
+        const maximo = Math.max(...numeros);
+        return maximo + 1;
+    },
+
+    /**
      * Mostrar formulario para crear carpeta
      */
     async mostrarFormularioCarpeta() {
+        const siguienteNo = this.obtenerSiguienteNoCarpeta();
+        
         return `
             <form id="formCarpeta" class="space-y-6 max-w-2xl">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <!-- Número de Carpeta Física -->
+                    <!-- Número de Carpeta Física (Automático) -->
                     <div>
                         <label for="noCarpeta" class="block text-sm font-medium mb-2" style="color: var(--text-primary);">
-                            <i class="fas fa-number mr-2"></i>No. Carpeta Física <span class="text-red-500">*</span>
+                            <i class="fas fa-hashtag mr-2"></i>No. Carpeta Física <span class="text-green-500" title="Se genera automáticamente">✓</span>
                         </label>
                         <input 
                             type="number" 
                             id="noCarpeta" 
                             name="no_carpeta_fisica" 
-                            required
-                            placeholder="Ej: 1, 2, 3..."
-                            class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            style="background-color: var(--card-bg); color: var(--text-primary); border-color: var(--border-color);"
+                            value="${siguienteNo}"
+                            readonly
+                            class="w-full px-4 py-2 border rounded-lg bg-opacity-50"
+                            style="background-color: var(--bg-secondary); color: var(--text-primary); border-color: var(--border-color); cursor: not-allowed;"
                         >
+                        <p class="text-xs mt-1" style="color: var(--text-secondary);">Se genera automáticamente</p>
                     </div>
 
                     <!-- Etiqueta Identificadora -->
