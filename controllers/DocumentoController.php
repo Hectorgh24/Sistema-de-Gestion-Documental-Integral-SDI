@@ -117,7 +117,8 @@ class DocumentoController
 
     /**
      * Crear nuevo documento
-     * POST /api/documentos
+     * POST /api/documentos/crear
+     * Soporta multipart/form-data con archivos adjuntos
      */
     public function crear()
     {
@@ -129,56 +130,210 @@ class DocumentoController
                 response(false, 'Método no permitido', null, 405);
             }
 
-            $input = json_decode(file_get_contents('php://input'), true);
+            // Detectar si es JSON o multipart
+            $isMultipart = strpos($_SERVER['CONTENT_TYPE'] ?? '', 'multipart/form-data') !== false;
 
-            if (!$input) {
-                response(false, 'Datos inválidos', null, 400);
+            if ($isMultipart) {
+                // Procesar multipart/form-data (con archivo)
+                return $this->crearDocumentoConArchivo();
+            } else {
+                // Procesar JSON
+                return $this->crearDocumentoJSON();
             }
-
-            // Validaciones
-            if (empty($input['id_categoria'])) {
-                response(false, 'Categoría requerida', null, 400);
-            }
-
-            if (empty($input['id_carpeta'])) {
-                response(false, 'Carpeta requerida', null, 400);
-            }
-
-            if (empty($input['fecha_documento'])) {
-                response(false, 'Fecha del documento requerida', null, 400);
-            }
-
-            // Verificar que la categoría y carpeta existan
-            if (!$this->categoriaModel->obtenerPorId($input['id_categoria'])) {
-                response(false, 'Categoría inválida', null, 400);
-            }
-
-            if (!$this->carpetaModel->obtenerPorId($input['id_carpeta'])) {
-                response(false, 'Carpeta inválida', null, 400);
-            }
-
-            // Crear documento
-            $id_documento = $this->documentoModel->crear([
-                'id_categoria'      => $input['id_categoria'],
-                'id_carpeta'        => $input['id_carpeta'],
-                'id_usuario_captura' => Autenticacion::getId(),
-                'fecha_documento'   => $input['fecha_documento'],
-                'valores'           => $input['valores'] ?? []
-            ]);
-
-            if (!$id_documento) {
-                response(false, 'Error al crear documento', null, 500);
-            }
-
-            $documento = $this->documentoModel->obtenerPorId($id_documento);
-
-            logger("Documento creado: ID $id_documento", 'INFO');
-            response(true, 'Documento creado', $documento, 201);
-
         } catch (\Exception $e) {
             logger("Error creando documento: " . $e->getMessage(), 'ERROR');
             response(false, $e->getMessage(), null, 400);
         }
+    }
+
+    /**
+     * Crear documento desde JSON
+     * @private
+     */
+    private function crearDocumentoJSON()
+    {
+        $input = json_decode(file_get_contents('php://input'), true);
+
+        if (!$input) {
+            response(false, 'Datos inválidos', null, 400);
+        }
+
+        // Validaciones
+        if (empty($input['id_categoria'])) {
+            response(false, 'Categoría requerida', null, 400);
+        }
+
+        if (empty($input['id_carpeta'])) {
+            response(false, 'Carpeta requerida', null, 400);
+        }
+
+        if (empty($input['fecha_documento'])) {
+            response(false, 'Fecha del documento requerida', null, 400);
+        }
+
+        // Verificar que la categoría y carpeta existan
+        if (!$this->categoriaModel->obtenerPorId($input['id_categoria'])) {
+            response(false, 'Categoría inválida', null, 400);
+        }
+
+        if (!$this->carpetaModel->obtenerPorId($input['id_carpeta'])) {
+            response(false, 'Carpeta inválida', null, 400);
+        }
+
+        // Crear documento
+        $id_documento = $this->documentoModel->crear([
+            'id_categoria'      => $input['id_categoria'],
+            'id_carpeta'        => $input['id_carpeta'],
+            'id_usuario_captura' => Autenticacion::getId(),
+            'fecha_documento'   => $input['fecha_documento'],
+            'valores'           => $input['valores'] ?? []
+        ]);
+
+        if (!$id_documento) {
+            response(false, 'Error al crear documento', null, 500);
+        }
+
+        $documento = $this->documentoModel->obtenerPorId($id_documento);
+
+        logger("Documento creado: ID $id_documento", 'INFO');
+        response(true, 'Documento creado', $documento, 201);
+    }
+
+    /**
+     * Crear documento desde multipart/form-data (con archivo)
+     * @private
+     */
+    private function crearDocumentoConArchivo()
+    {
+        // Validaciones básicas
+        if (empty($_POST['id_carpeta'])) {
+            response(false, 'Carpeta requerida', null, 400);
+        }
+
+        if (empty($_POST['fecha_documento'])) {
+            response(false, 'Fecha del documento requerida', null, 400);
+        }
+
+        $id_categoria = $_POST['id_categoria'] ?? null;
+        if (!$id_categoria || !$this->categoriaModel->obtenerPorId($id_categoria)) {
+            response(false, 'Categoría inválida', null, 400);
+        }
+
+        $id_carpeta = (int)$_POST['id_carpeta'];
+        if (!$this->carpetaModel->obtenerPorId($id_carpeta)) {
+            response(false, 'Carpeta inválida', null, 400);
+        }
+
+        // Crear documento
+        $id_documento = $this->documentoModel->crear([
+            'id_categoria'      => $id_categoria,
+            'id_carpeta'        => $id_carpeta,
+            'id_usuario_captura' => Autenticacion::getId(),
+            'fecha_documento'   => $_POST['fecha_documento'],
+            'valores'           => []
+        ]);
+
+        if (!$id_documento) {
+            response(false, 'Error al crear documento', null, 500);
+        }
+
+        // Procesar valores dinámicos si existen
+        if (!empty($_POST['valores_dinamicos'])) {
+            try {
+                $valoresDinamicos = json_decode($_POST['valores_dinamicos'], true);
+                if (is_array($valoresDinamicos)) {
+                    // Actualizar documento con valores
+                    $this->documentoModel->actualizar($id_documento, [
+                        'valores' => $valoresDinamicos
+                    ]);
+                }
+            } catch (\Exception $e) {
+                logger("Error procesando valores dinámicos: " . $e->getMessage(), 'ERROR');
+            }
+        }
+
+        // Procesar archivo adjunto si existe
+        if (!empty($_FILES['archivo']) && $_FILES['archivo']['error'] === UPLOAD_ERR_OK) {
+            try {
+                $this->guardarArchivoAdjunto($id_documento, $_FILES['archivo']);
+            } catch (\Exception $e) {
+                logger("Error guardando archivo: " . $e->getMessage(), 'WARNING');
+                // No fallar si falla el archivo, el documento ya está creado
+            }
+        }
+
+        $documento = $this->documentoModel->obtenerPorId($id_documento);
+
+        logger("Documento creado con archivo: ID $id_documento", 'INFO');
+        response(true, 'Documento creado', $documento, 201);
+    }
+
+    /**
+     * Guardar archivo adjunto
+     * @private
+     */
+    private function guardarArchivoAdjunto($id_documento, $archivo)
+    {
+        // Validaciones de archivo
+        $extensionesPermitidas = ['pdf', 'jpg', 'jpeg', 'png', 'docx', 'doc'];
+        $tiposPermitidos = [
+            'application/pdf',
+            'image/jpeg',
+            'image/png',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/msword'
+        ];
+
+        $nombreArchivo = $archivo['name'];
+        $ext = strtolower(pathinfo($nombreArchivo, PATHINFO_EXTENSION));
+        $tipoMime = $archivo['type'];
+
+        if (!in_array($ext, $extensionesPermitidas)) {
+            throw new \Exception("Tipo de archivo no permitido");
+        }
+
+        if (!in_array($tipoMime, $tiposPermitidos)) {
+            throw new \Exception("MIME type no permitido");
+        }
+
+        if ($archivo['size'] > 10 * 1024 * 1024) { // 10MB máx
+            throw new \Exception("Archivo muy grande (máx 10MB)");
+        }
+
+        // Crear directorio de uploads si no existe
+        $uploadsDir = APP_ROOT . '/public/uploads';
+        if (!is_dir($uploadsDir)) {
+            mkdir($uploadsDir, 0755, true);
+        }
+
+        // Generar nombre único para el archivo
+        $nombreBase = 'doc_' . $id_documento . '_' . time();
+        $rutaArchivo = $uploadsDir . '/' . $nombreBase . '.' . $ext;
+        $rutaRelativa = '/public/uploads/' . $nombreBase . '.' . $ext;
+
+        // Mover archivo
+        if (!move_uploaded_file($archivo['tmp_name'], $rutaArchivo)) {
+            throw new \Exception("Error al guardar archivo");
+        }
+
+        // Registrar en BD
+        $success = $this->documentoModel->guardarArchivoAdjunto(
+            $id_documento,
+            $rutaRelativa,
+            $nombreBase,
+            $ext,
+            $tipoMime,
+            $archivo['size']
+        );
+
+        if (!$success) {
+            // Eliminar archivo si falló el registro en BD
+            @unlink($rutaArchivo);
+            throw new \Exception("Error al registrar archivo en BD");
+        }
+
+        logger("Archivo guardado para documento $id_documento: $rutaRelativa", 'INFO');
+        return true;
     }
 
     /**

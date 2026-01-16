@@ -529,6 +529,40 @@ class Documento
     }
 
     /**
+     * Guardar archivo adjunto
+     * 
+     * @param int $id_registro ID del documento
+     * @param string $ruta_archivo Ruta del archivo guardado
+     * @param string $nombre_base Nombre sin extensión
+     * @param string $extension Extensión del archivo
+     * @param string $tipo_mime Tipo MIME del archivo
+     * @param int $peso_bytes Tamaño del archivo en bytes
+     * @return bool True si se guardó exitosamente
+     */
+    public function guardarArchivoAdjunto($id_registro, $ruta_archivo, $nombre_base, $extension, $tipo_mime, $peso_bytes)
+    {
+        try {
+            $sql = "INSERT INTO " . self::TABLE_ARCHIVOS . "
+                    (id_registro, nombre_base, extension_archivo, tipo_mime, peso_bytes, ruta_almacenamiento)
+                    VALUES (:id_registro, :nombre_base, :extension, :tipo_mime, :peso_bytes, :ruta)";
+
+            $stmt = $this->db->prepare($sql);
+            return $stmt->execute([
+                ':id_registro' => $id_registro,
+                ':nombre_base' => $nombre_base,
+                ':extension' => $extension,
+                ':tipo_mime' => $tipo_mime,
+                ':peso_bytes' => $peso_bytes,
+                ':ruta' => $ruta_archivo
+            ]);
+
+        } catch (PDOException $e) {
+            logger("Error guardando archivo adjunto: " . $e->getMessage(), 'ERROR');
+            return false;
+        }
+    }
+
+    /**
      * Contar documentos por estado de gestión
      * 
      * @param string $estado Estado a contar

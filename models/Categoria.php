@@ -248,6 +248,17 @@ class Categoria
     }
 
     /**
+     * Obtener columnas de una categoría (alias de obtenerCampos)
+     * 
+     * @param int $id_categoria ID de la categoría
+     * @return array Arreglo de columnas ordenadas
+     */
+    public function obtenerColumnas($id_categoria)
+    {
+        return $this->obtenerCampos($id_categoria);
+    }
+
+    /**
      * Crear campo dinámico para una categoría
      * 
      * @param int $id_categoria ID de la categoría

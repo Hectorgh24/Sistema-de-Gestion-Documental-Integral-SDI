@@ -164,5 +164,31 @@ class CategoriaController
             response(false, $e->getMessage(), null, 400);
         }
     }
+
+    /**
+     * Obtener columnas de una categoría
+     * GET /api/categorias/:id/columnas
+     */
+    public function columnas($id)
+    {
+        try {
+            Autenticacion::requerirAutenticacion();
+
+            if (!$this->categoriaModel->obtenerPorId((int)$id)) {
+                response(false, 'Categoría no encontrada', null, 404);
+            }
+
+            $columnas = $this->categoriaModel->obtenerColumnas((int)$id);
+
+            $data = [
+                'columnas' => $columnas
+            ];
+
+            response(true, 'Columnas obtenidas', $data, 200);
+        } catch (\Exception $e) {
+            logger("Error obteniendo columnas: " . $e->getMessage(), 'ERROR');
+            response(false, $e->getMessage(), null, 400);
+        }
+    }
 }
 ?>

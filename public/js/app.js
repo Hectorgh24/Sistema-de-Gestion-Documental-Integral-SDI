@@ -80,6 +80,13 @@ function obtenerOpcionesMenu() {
             visible: auth.esAdmin() || auth.esAdministrativo()
         },
         {
+            titulo: 'Archivo General SDI',
+            icono: 'fa-archive',
+            descripcion: 'Categoría archivo general SDI',
+            modulo: 'archivo-general',
+            visible: true
+        },
+        {
             titulo: 'Categorías',
             icono: 'fa-tags',
             descripcion: 'Gestionar categorías',
@@ -146,6 +153,9 @@ async function cargarContenidoModulo(modulo) {
                 break;
             case 'carpetas':
                 html = await cargarCarpetas();
+                break;
+            case 'archivo-general':
+                html = await cargarArchivoGeneral();
                 break;
             case 'categorias':
                 html = await cargarCategorias();
@@ -546,6 +556,26 @@ function mostrarFormularioNuevoUsuario() {
 
 function editarUsuario(id) {
     usuariosModule.editarUsuario(id);
+}
+
+/**
+ * Cargar módulo Archivo General SDI
+ */
+async function cargarArchivoGeneral() {
+    try {
+        // Cargar el módulo dinámicamente
+        if (typeof archivoGeneralModule === 'undefined') {
+            return '<p style="color: var(--text-primary);">Error: Módulo no disponible</p>';
+        }
+
+        // Inicializar el módulo
+        await archivoGeneralModule.init();
+        return await archivoGeneralModule.cargarVista();
+    } catch (error) {
+        console.error('Error cargando Archivo General:', error);
+        return '<p style="color: var(--text-primary);">Error al cargar el módulo Archivo General</p>';
+    }
+}
 }
 
 function eliminarUsuario(id) {
