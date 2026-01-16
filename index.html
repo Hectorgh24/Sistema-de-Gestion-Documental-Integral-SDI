@@ -198,19 +198,41 @@
         }
 
         /* Mejorar visibilidad de iconos en módulos del dashboard */
-        /* Iconos blancos en módulos azules (tarjetas de módulos) */
-        .from-blue-500 .fa-chart-line,
-        .from-blue-500 .fa-users,
-        .from-blue-500 .fa-file-alt,
-        .from-blue-500 .fa-folder,
-        .from-blue-500 .fa-tags,
-        .from-blue-500 .fa-user-circle,
-        .to-blue-600 .fa-chart-line,
-        .to-blue-600 .fa-users,
-        .to-blue-600 .fa-file-alt,
-        .to-blue-600 .fa-folder,
-        .to-blue-600 .fa-tags,
-        .to-blue-600 .fa-user-circle {
+        /* EN MODO CLARO: Iconos NEGROS en módulos azules (tarjetas de módulos) */
+        :root .from-blue-500 .fa-chart-line,
+        :root .from-blue-500 .fa-users,
+        :root .from-blue-500 .fa-file-alt,
+        :root .from-blue-500 .fa-folder,
+        :root .from-blue-500 .fa-tags,
+        :root .from-blue-500 .fa-user-circle,
+        :root .from-blue-500 .fa-archive,
+        :root .to-blue-600 .fa-chart-line,
+        :root .to-blue-600 .fa-users,
+        :root .to-blue-600 .fa-file-alt,
+        :root .to-blue-600 .fa-folder,
+        :root .to-blue-600 .fa-tags,
+        :root .to-blue-600 .fa-user-circle,
+        :root .to-blue-600 .fa-archive {
+            color: #000000 !important;
+            filter: drop-shadow(0 2px 4px rgba(255, 255, 255, 0.3));
+            text-shadow: 0 1px 2px rgba(255, 255, 255, 0.2);
+        }
+
+        /* EN MODO OSCURO: Iconos BLANCOS en módulos azules (tarjetas de módulos) */
+        [data-theme="dark"] .from-blue-500 .fa-chart-line,
+        [data-theme="dark"] .from-blue-500 .fa-users,
+        [data-theme="dark"] .from-blue-500 .fa-file-alt,
+        [data-theme="dark"] .from-blue-500 .fa-folder,
+        [data-theme="dark"] .from-blue-500 .fa-tags,
+        [data-theme="dark"] .from-blue-500 .fa-user-circle,
+        [data-theme="dark"] .from-blue-500 .fa-archive,
+        [data-theme="dark"] .to-blue-600 .fa-chart-line,
+        [data-theme="dark"] .to-blue-600 .fa-users,
+        [data-theme="dark"] .to-blue-600 .fa-file-alt,
+        [data-theme="dark"] .to-blue-600 .fa-folder,
+        [data-theme="dark"] .to-blue-600 .fa-tags,
+        [data-theme="dark"] .to-blue-600 .fa-user-circle,
+        [data-theme="dark"] .to-blue-600 .fa-archive {
             color: #ffffff !important;
             filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
             text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
