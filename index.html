@@ -260,10 +260,10 @@
             </div>
 
             <!-- Botón Volver (solo visible fuera del dashboard) -->
-            <div id="backButtonContainer" class="hidden">
-                <button onclick="navegacionModule.volverAtras()" class="flex items-center space-x-2 px-4 py-2 rounded-lg transition font-medium" style="color: var(--text-primary); background-color: var(--bg-tertiary); border: 1px solid var(--border-color);" onmouseover="this.style.backgroundColor='var(--bg-secondary)'; this.style.borderColor='var(--icon-color)'" onmouseout="this.style.backgroundColor='var(--bg-tertiary)'; this.style.borderColor='var(--border-color)'" title="Volver">
-                    <i class="fas fa-arrow-left" style="color: var(--icon-color);"></i>
-                    <span class="hidden md:inline">Volver</span>
+            <div id="backButtonContainer" class="hidden flex justify-center flex-1">
+                <button onclick="navegacionModule.volverAtras()" class="flex items-center space-x-3 px-8 py-3 rounded-lg transition font-bold text-lg" style="color: var(--text-primary); background-color: var(--bg-tertiary); border: 2px solid var(--border-color);" onmouseover="this.style.backgroundColor='var(--bg-secondary)'; this.style.borderColor='var(--icon-color)'; this.style.transform='scale(1.05)'" onmouseout="this.style.backgroundColor='var(--bg-tertiary)'; this.style.borderColor='var(--border-color)'; this.style.transform='scale(1)'" title="Volver">
+                    <i class="fas fa-arrow-left text-xl" style="color: var(--icon-color);"></i>
+                    <span>Volver</span>
                 </button>
             </div>
 
