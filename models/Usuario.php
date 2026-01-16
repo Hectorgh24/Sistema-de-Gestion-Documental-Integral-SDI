@@ -1,469 +1,396 @@
 <?php
+namespace App\Models;
+
+use PDO;
+use PDOException;
+
 /**
- * Modelo Usuario - SDI Gestión Documental
- * Maneja todas las operaciones relacionadas con usuarios
+ * Model: Usuario
  * 
- * Seguridad: Todas las consultas usan Prepared Statements
+ * Gestiona todas las operaciones CRUD para usuarios del sistema.
+ * Implementa validaciones y control de acceso por rol.
+ * 
+ * Estados de usuario: activo | inactivo | suspendido
+ * 
+ * @author SDI Development Team
+ * @version 2.0
  */
+class Usuario
+{
+    protected $db;
+    protected const TABLE = 'usuarios';
 
-require_once __DIR__ . '/../config/autoload.php';
-
-class Usuario {
-    private $pdo;
-    
-    public function __construct() {
-        $this->pdo = getDBConnection();
-    }
-    
     /**
-     * Busca un usuario por email
+     * Constructor - Inyección de dependencias
      * 
-     * @param string $email Email del usuario
-     * @return array|false Datos del usuario o false si no existe
+     * @param PDO $db Conexión a base de datos
      */
-    public function buscarPorEmail(string $email) {
-        try {
-            $sql = "SELECT u.id_usuario, u.nombre, u.apellido_paterno, u.apellido_materno, u.email, u.password_hash, 
-                           u.id_rol, u.estado, u.fecha_registro,
-                           r.nombre_rol, r.descripcion as rol_descripcion,
-                           TRIM(CONCAT(u.nombre, ' ', u.apellido_paterno, IF(u.apellido_materno IS NOT NULL AND u.apellido_materno != '', CONCAT(' ', u.apellido_materno), ''))) as nombre_completo
-                    FROM usuarios u
-                    INNER JOIN roles r ON u.id_rol = r.id_rol
-                    WHERE u.email = :email
-                    LIMIT 1";
-            
-            $stmt = executeQuery($sql, ['email' => $email]);
-            $usuario = $stmt->fetch();
-            
-            return $usuario ? $usuario : false;
-            
-        } catch (PDOException $e) {
-            error_log("Error al buscar usuario por email: " . $e->getMessage());
-            return false;
-        }
+    public function __construct(PDO $db = null)
+    {
+        $this->db = $db ?? getDBConnection();
     }
-    
+
     /**
-     * Busca un usuario por ID
+     * Obtener usuario por ID
      * 
      * @param int $id_usuario ID del usuario
-     * @return array|false Datos del usuario o false si no existe
+     * @return array|null Datos del usuario o null si no existe
      */
-    public function buscarPorId(int $id_usuario) {
-        try {
-            $sql = "SELECT u.id_usuario, u.nombre, u.apellido_paterno, u.apellido_materno, u.email, 
-                           u.id_rol, u.estado, u.fecha_registro,
-                           r.nombre_rol, r.descripcion as rol_descripcion,
-                           TRIM(CONCAT(u.nombre, ' ', u.apellido_paterno, IF(u.apellido_materno IS NOT NULL AND u.apellido_materno != '', CONCAT(' ', u.apellido_materno), ''))) as nombre_completo
-                    FROM usuarios u
-                    INNER JOIN roles r ON u.id_rol = r.id_rol
-                    WHERE u.id_usuario = :id_usuario
-                    LIMIT 1";
-            
-            $stmt = executeQuery($sql, ['id_usuario' => $id_usuario]);
-            $usuario = $stmt->fetch();
-            
-            return $usuario ? $usuario : false;
-            
-        } catch (PDOException $e) {
-            error_log("Error al buscar usuario por ID: " . $e->getMessage());
-            return false;
-        }
+    public function obtenerPorId($id_usuario)
+    {
+        $sql = "SELECT u.id_usuario, u.nombre, u.apellido_paterno, u.apellido_materno,
+                       u.email, u.estado, u.fecha_registro, r.nombre_rol, r.id_rol
+                FROM " . self::TABLE . " u
+                JOIN roles r ON u.id_rol = r.id_rol
+                WHERE u.id_usuario = :id";
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([':id' => $id_usuario]);
+        
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
     }
-    
+
     /**
-     * Verifica las credenciales de un usuario
+     * Obtener usuario por email
      * 
      * @param string $email Email del usuario
-     * @param string $password Contraseña en texto plano
-     * @return array|false Datos del usuario si las credenciales son correctas, false en caso contrario
+     * @return array|null Datos del usuario
      */
-    public function verificarCredenciales(string $email, string $password) {
-        $usuario = $this->buscarPorEmail($email);
+    public function obtenerPorEmail($email)
+    {
+        try {
+            logger("MODEL: Buscando usuario en BD con email: $email", 'DEBUG');
+            
+            $sql = "SELECT u.*, r.nombre_rol, r.id_rol
+                    FROM " . self::TABLE . " u
+                    JOIN roles r ON u.id_rol = r.id_rol
+                    WHERE u.email = :email";
+
+            logger("MODEL: SQL Query preparada para email", 'DEBUG');
+            
+            $stmt = $this->db->prepare($sql);
+            logger("MODEL: Ejecutando query con email: $email", 'DEBUG');
+            $stmt->execute([':email' => $email]);
+            
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($result) {
+                logger("MODEL: ✓ Usuario encontrado en BD - ID: " . $result['id_usuario'] . ", nombre: " . ($result['nombre'] ?? 'NULL') . ", estado: " . $result['estado'], 'DEBUG');
+                // Log de campos para debug
+                logger("MODEL: Campos del usuario: " . json_encode(array_keys($result)), 'DEBUG');
+            } else {
+                logger("MODEL: ✗ Usuario NO encontrado en BD para email: $email", 'DEBUG');
+            }
+            
+            return $result ?: null;
+            
+        } catch (PDOException $e) {
+            logger("MODEL: Error BD al obtener usuario por email - " . $e->getMessage(), 'ERROR', ['email' => $email, 'code' => $e->getCode()]);
+            return null;
+        }
+    }
+
+    /**
+     * Listar todos los usuarios con paginación y filtros
+     * 
+     * @param int $limit Límite de registros por página
+     * @param int $offset Desplazamiento
+     * @param string $estado Filtrar por estado (opcional)
+     * @param string $rol Filtrar por rol (opcional)
+     * @return array Arreglo de usuarios
+     */
+    public function listar($limit = 10, $offset = 0, $estado = null, $rol = null)
+    {
+        $sql = "SELECT u.id_usuario, u.nombre, u.apellido_paterno, u.apellido_materno,
+                       u.email, u.estado, u.fecha_registro, r.nombre_rol
+                FROM " . self::TABLE . " u
+                JOIN roles r ON u.id_rol = r.id_rol
+                WHERE 1=1";
+
+        $params = [];
+
+        if ($estado !== null) {
+            $sql .= " AND u.estado = :estado";
+            $params[':estado'] = $estado;
+        }
+
+        if ($rol !== null) {
+            $sql .= " AND r.nombre_rol = :rol";
+            $params[':rol'] = $rol;
+        }
+
+        $sql .= " ORDER BY u.fecha_registro DESC LIMIT :limit OFFSET :offset";
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->bindValue(':limit', (int)$limit, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', (int)$offset, PDO::PARAM_INT);
         
+        foreach ($params as $key => $value) {
+            $stmt->bindValue($key, $value);
+        }
+
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Contar total de usuarios con filtros opcionales
+     * 
+     * @param string $estado Filtrar por estado
+     * @param string $rol Filtrar por rol
+     * @return int Total de usuarios
+     */
+    public function contar($estado = null, $rol = null)
+    {
+        $sql = "SELECT COUNT(*) as total FROM " . self::TABLE . " u
+                JOIN roles r ON u.id_rol = r.id_rol WHERE 1=1";
+
+        $params = [];
+
+        if ($estado !== null) {
+            $sql .= " AND u.estado = :estado";
+            $params[':estado'] = $estado;
+        }
+
+        if ($rol !== null) {
+            $sql .= " AND r.nombre_rol = :rol";
+            $params[':rol'] = $rol;
+        }
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        return (int)($result['total'] ?? 0);
+    }
+
+    /**
+     * Crear nuevo usuario
+     * 
+     * @param array $data Datos del usuario
+     *   - nombre (requerido)
+     *   - apellido_paterno (requerido)
+     *   - apellido_materno (opcional)
+     *   - email (requerido)
+     *   - password (requerido, será hasheado)
+     *   - id_rol (requerido)
+     * 
+     * @return array|false Datos del usuario creado o false
+     * @throws Exception Si falta información requerida
+     */
+    public function crear($data)
+    {
+        // Validaciones
+        $required = ['nombre', 'apellido_paterno', 'email', 'password', 'id_rol'];
+        foreach ($required as $field) {
+            if (empty($data[$field])) {
+                throw new \Exception("Campo requerido faltante: $field");
+            }
+        }
+
+        // Verificar que el email sea único
+        if ($this->obtenerPorEmail($data['email'])) {
+            throw new \Exception("El email ya está registrado");
+        }
+
+        // Verificar que el rol exista
+        $rolesModel = new Rol($this->db);
+        if (!$rolesModel->obtenerPorId($data['id_rol'])) {
+            throw new \Exception("Rol inválido");
+        }
+
+        try {
+            $this->db->beginTransaction();
+
+            // Hash de la contraseña con BCRYPT
+            $passwordHash = password_hash($data['password'], PASSWORD_BCRYPT, ['cost' => 10]);
+
+            $sql = "INSERT INTO " . self::TABLE . "
+                    (id_rol, nombre, apellido_paterno, apellido_materno, email, password_hash, estado)
+                    VALUES (:id_rol, :nombre, :apellido_paterno, :apellido_materno, :email, :password_hash, :estado)";
+
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute([
+                ':id_rol'              => $data['id_rol'],
+                ':nombre'              => trim($data['nombre']),
+                ':apellido_paterno'    => trim($data['apellido_paterno']),
+                ':apellido_materno'    => trim($data['apellido_materno'] ?? ''),
+                ':email'               => strtolower(trim($data['email'])),
+                ':password_hash'       => $passwordHash,
+                ':estado'              => 'activo'
+            ]);
+
+            $id_usuario = $this->db->lastInsertId();
+            $this->db->commit();
+
+            // Retornar datos del usuario creado (sin contraseña)
+            return $this->obtenerPorId($id_usuario);
+
+        } catch (PDOException $e) {
+            $this->db->rollBack();
+            logger("Error creando usuario: " . $e->getMessage(), 'ERROR');
+            throw new \Exception("Error al crear usuario");
+        }
+    }
+
+    /**
+     * Actualizar usuario
+     * 
+     * @param int $id_usuario ID del usuario
+     * @param array $data Datos a actualizar
+     * @return array|false Datos actualizados
+     */
+    public function actualizar($id_usuario, $data)
+    {
+        try {
+            $this->db->beginTransaction();
+
+            // Campos que se pueden actualizar
+            $updatable = ['nombre', 'apellido_paterno', 'apellido_materno', 'email', 'estado', 'id_rol'];
+            $updates = [];
+            $params = [':id' => $id_usuario];
+
+            foreach ($data as $key => $value) {
+                if (in_array($key, $updatable) && $value !== null) {
+                    if ($key === 'email') {
+                        // Verificar unicidad del email
+                        $existing = $this->db->prepare(
+                            "SELECT id_usuario FROM " . self::TABLE . " WHERE email = :email AND id_usuario != :id"
+                        );
+                        $existing->execute([':email' => $value, ':id' => $id_usuario]);
+                        if ($existing->fetch()) {
+                            throw new \Exception("El email ya está en uso");
+                        }
+                        $value = strtolower(trim($value));
+                    }
+                    
+                    $updates[] = "$key = :$key";
+                    $params[":$key"] = is_string($value) ? trim($value) : $value;
+                }
+            }
+
+            if (empty($updates)) {
+                return $this->obtenerPorId($id_usuario);
+            }
+
+            $sql = "UPDATE " . self::TABLE . " SET " . implode(', ', $updates) . " WHERE id_usuario = :id";
+            
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute($params);
+
+            $this->db->commit();
+            return $this->obtenerPorId($id_usuario);
+
+        } catch (PDOException $e) {
+            $this->db->rollBack();
+            logger("Error actualizando usuario: " . $e->getMessage(), 'ERROR');
+            throw new \Exception("Error al actualizar usuario");
+        }
+    }
+
+    /**
+     * Cambiar contraseña de usuario
+     * 
+     * @param int $id_usuario ID del usuario
+     * @param string $password_actual Contraseña actual
+     * @param string $password_nueva Nueva contraseña
+     * @return bool True si se cambió exitosamente
+     */
+    public function cambiarPassword($id_usuario, $password_actual, $password_nueva)
+    {
+        $usuario = $this->obtenerPorId($id_usuario);
         if (!$usuario) {
-            return false;
+            throw new \Exception("Usuario no encontrado");
         }
-        
-        // Verificar que el usuario esté activo
-        if ($usuario['estado'] !== ESTADO_ACTIVO) {
-            return false;
+
+        // Verificar contraseña actual
+        if (!password_verify($password_actual, $usuario['password_hash'] ?? '')) {
+            throw new \Exception("Contraseña actual incorrecta");
         }
+
+        $passwordHash = password_hash($password_nueva, PASSWORD_BCRYPT, ['cost' => 10]);
+
+        $sql = "UPDATE " . self::TABLE . " SET password_hash = :password WHERE id_usuario = :id";
+        $stmt = $this->db->prepare($sql);
         
-        // Verificar contraseña usando password_verify()
-        if (!password_verify($password, $usuario['password_hash'])) {
-            return false;
-        }
-        
-        // Eliminar password_hash del array antes de retornar
-        unset($usuario['password_hash']);
-        
-        return $usuario;
+        return $stmt->execute([
+            ':password' => $passwordHash,
+            ':id' => $id_usuario
+        ]);
     }
-    
+
     /**
-     * Crea un nuevo usuario
+     * Verificar contraseña de usuario
      * 
-     * @param array $datos Datos del usuario ['nombre', 'apellido_paterno', 'apellido_materno', 'email', 'password', 'id_rol']
-     * @return int|false ID del usuario creado o false si hay error
+     * @param string $password Contraseña en texto plano
+     * @param string $hash Hash almacenado
+     * @return bool True si la contraseña es correcta
      */
-    public function crear(array $datos) {
-        try {
-            // Validar datos requeridos
-            $camposRequeridos = ['nombre', 'apellido_paterno', 'email', 'password', 'id_rol'];
-            foreach ($camposRequeridos as $campo) {
-                if (!isset($datos[$campo]) || empty($datos[$campo])) {
-                    return false;
-                }
-            }
-            
-            // Verificar que el email no exista
-            if ($this->buscarPorEmail($datos['email'])) {
-                return false; // Email ya existe
-            }
-            
-            // Hash de la contraseña
-            $passwordHash = password_hash($datos['password'], PASSWORD_DEFAULT);
-            
-            $sql = "INSERT INTO usuarios (nombre, apellido_paterno, apellido_materno, email, password_hash, id_rol, estado)
-                    VALUES (:nombre, :apellido_paterno, :apellido_materno, :email, :password_hash, :id_rol, :estado)";
-            
-            $params = [
-                'nombre' => sanitizeInput($datos['nombre']),
-                'apellido_paterno' => sanitizeInput($datos['apellido_paterno']),
-                'apellido_materno' => isset($datos['apellido_materno']) ? sanitizeInput($datos['apellido_materno']) : null,
-                'email' => sanitizeInput($datos['email']),
-                'password_hash' => $passwordHash,
-                'id_rol' => validateInt($datos['id_rol']),
-                'estado' => ESTADO_ACTIVO
-            ];
-            
-            $stmt = executeQuery($sql, $params);
-            
-            return $this->pdo->lastInsertId();
-            
-        } catch (PDOException $e) {
-            error_log("Error al crear usuario: " . $e->getMessage());
-            return false;
-        }
+    public function verificarPassword($password, $hash)
+    {
+        return password_verify($password, $hash);
     }
-    
+
     /**
-     * Actualiza la contraseña de un usuario
+     * Eliminar usuario (cambiar a inactivo)
      * 
      * @param int $id_usuario ID del usuario
-     * @param string $nuevaPassword Nueva contraseña en texto plano
-     * @return bool True si se actualizó correctamente
+     * @return bool True si se eliminó exitosamente
      */
-    public function actualizarPassword(int $id_usuario, string $nuevaPassword) {
-        try {
-            $passwordHash = password_hash($nuevaPassword, PASSWORD_DEFAULT);
-            
-            $sql = "UPDATE usuarios 
-                    SET password_hash = :password_hash
-                    WHERE id_usuario = :id_usuario";
-            
-            $params = [
-                'password_hash' => $passwordHash,
-                'id_usuario' => $id_usuario
-            ];
-            
-            $stmt = executeQuery($sql, $params);
-            
-            return $stmt->rowCount() > 0;
-            
-        } catch (PDOException $e) {
-            error_log("Error al actualizar contraseña: " . $e->getMessage());
-            return false;
-        }
+    public function eliminar($id_usuario)
+    {
+        // En lugar de eliminar físicamente, marcar como inactivo
+        $sql = "UPDATE " . self::TABLE . " SET estado = :estado WHERE id_usuario = :id";
+        $stmt = $this->db->prepare($sql);
+        
+        return $stmt->execute([
+            ':estado' => 'inactivo',
+            ':id' => $id_usuario
+        ]);
     }
-    
+
     /**
-     * Actualiza el estado de un usuario
+     * Cambiar estado de usuario
      * 
      * @param int $id_usuario ID del usuario
-     * @param string $estado Nuevo estado ('activo' o 'inactivo')
-     * @return bool True si se actualizó correctamente
+     * @param string $estado Nuevo estado: activo | inactivo | suspendido
+     * @return bool True si cambió exitosamente
      */
-    public function actualizarEstado(int $id_usuario, string $estado) {
-        try {
-            if (!in_array($estado, [ESTADO_ACTIVO, ESTADO_INACTIVO])) {
-                return false;
-            }
-            
-            $sql = "UPDATE usuarios 
-                    SET estado = :estado
-                    WHERE id_usuario = :id_usuario";
-            
-            $params = [
-                'estado' => $estado,
-                'id_usuario' => $id_usuario
-            ];
-            
-            $stmt = executeQuery($sql, $params);
-            
-            return $stmt->rowCount() > 0;
-            
-        } catch (PDOException $e) {
-            error_log("Error al actualizar estado: " . $e->getMessage());
-            return false;
+    public function cambiarEstado($id_usuario, $estado)
+    {
+        $estados_validos = ['activo', 'inactivo', 'suspendido'];
+        
+        if (!in_array($estado, $estados_validos)) {
+            throw new \Exception("Estado inválido: $estado");
         }
+
+        $sql = "UPDATE " . self::TABLE . " SET estado = :estado WHERE id_usuario = :id";
+        $stmt = $this->db->prepare($sql);
+        
+        return $stmt->execute([
+            ':estado' => $estado,
+            ':id' => $id_usuario
+        ]);
     }
-    
+
     /**
-     * Obtiene todos los usuarios (con paginación opcional)
+     * Obtener estadísticas de usuarios
      * 
-     * @param int $limit Límite de resultados
-     * @param int $offset Offset para paginación
-     * @return array Lista de usuarios
+     * @return array Estadísticas generales
      */
-    public function listar(int $limit = 50, int $offset = 0) {
-        try {
-            $sql = "SELECT u.id_usuario, u.nombre, u.apellido_paterno, u.apellido_materno, u.email, 
-                           u.id_rol, u.estado, u.fecha_registro,
-                           r.nombre_rol, r.descripcion as rol_descripcion,
-                           TRIM(CONCAT(u.nombre, ' ', u.apellido_paterno, IF(u.apellido_materno IS NOT NULL AND u.apellido_materno != '', CONCAT(' ', u.apellido_materno), ''))) as nombre_completo
-                    FROM usuarios u
-                    INNER JOIN roles r ON u.id_rol = r.id_rol
-                    ORDER BY u.fecha_registro DESC
-                    LIMIT :limit OFFSET :offset";
-            
-            $params = [
-                'limit' => $limit,
-                'offset' => $offset
-            ];
-            
-            $stmt = executeQuery($sql, $params);
-            
-            return $stmt->fetchAll();
-            
-        } catch (PDOException $e) {
-            error_log("Error al listar usuarios: " . $e->getMessage());
-            return [];
-        }
-    }
-    
-    /**
-     * Cuenta el total de usuarios
-     * 
-     * @return int Total de usuarios
-     */
-    public function contar() {
-        try {
-            $sql = "SELECT COUNT(*) as total FROM usuarios";
-            $stmt = executeQuery($sql);
-            $resultado = $stmt->fetch();
-            
-            return (int) $resultado['total'];
-            
-        } catch (PDOException $e) {
-            error_log("Error al contar usuarios: " . $e->getMessage());
-            return 0;
-        }
-    }
-    
-    /**
-     * Actualiza un usuario existente
-     * 
-     * @param int $id_usuario ID del usuario
-     * @param array $datos Datos a actualizar ['nombre', 'apellido_paterno', 'apellido_materno', 'email', 'password', 'id_rol', 'estado']
-     * @return bool True si se actualizó correctamente
-     */
-    public function actualizar(int $id_usuario, array $datos) {
-        try {
-            // Verificar que el usuario existe
-            $usuarioActual = $this->buscarPorId($id_usuario);
-            if (!$usuarioActual) {
-                return false;
-            }
-            
-            // Construir la consulta dinámicamente según los campos proporcionados
-            $campos = [];
-            $params = ['id_usuario' => $id_usuario];
-            
-            if (isset($datos['nombre']) && !empty($datos['nombre'])) {
-                $campos[] = "nombre = :nombre";
-                $params['nombre'] = sanitizeInput($datos['nombre']);
-            }
-            
-            if (isset($datos['apellido_paterno']) && !empty($datos['apellido_paterno'])) {
-                $campos[] = "apellido_paterno = :apellido_paterno";
-                $params['apellido_paterno'] = sanitizeInput($datos['apellido_paterno']);
-            }
-            
-            if (isset($datos['apellido_materno'])) {
-                $campos[] = "apellido_materno = :apellido_materno";
-                $params['apellido_materno'] = !empty($datos['apellido_materno']) ? sanitizeInput($datos['apellido_materno']) : null;
-            }
-            
-            if (isset($datos['email']) && !empty($datos['email'])) {
-                // Verificar que el email no esté en uso por otro usuario
-                $usuarioConEmail = $this->buscarPorEmail($datos['email']);
-                if ($usuarioConEmail && $usuarioConEmail['id_usuario'] != $id_usuario) {
-                    return false; // Email ya está en uso
-                }
-                $campos[] = "email = :email";
-                $params['email'] = sanitizeInput($datos['email']);
-            }
-            
-            if (isset($datos['password']) && !empty($datos['password'])) {
-                $campos[] = "password_hash = :password_hash";
-                $params['password_hash'] = password_hash($datos['password'], PASSWORD_DEFAULT);
-            }
-            
-            if (isset($datos['id_rol'])) {
-                $idRol = validateInt($datos['id_rol']);
-                if ($idRol) {
-                    $campos[] = "id_rol = :id_rol";
-                    $params['id_rol'] = $idRol;
-                }
-            }
-            
-            if (isset($datos['estado']) && in_array($datos['estado'], [ESTADO_ACTIVO, ESTADO_INACTIVO])) {
-                $campos[] = "estado = :estado";
-                $params['estado'] = $datos['estado'];
-            }
-            
-            if (empty($campos)) {
-                return false; // No hay nada que actualizar
-            }
-            
-            $sql = "UPDATE usuarios SET " . implode(", ", $campos) . " WHERE id_usuario = :id_usuario";
-            $stmt = executeQuery($sql, $params);
-            
-            return $stmt->rowCount() > 0;
-            
-        } catch (PDOException $e) {
-            error_log("Error al actualizar usuario: " . $e->getMessage());
-            return false;
-        }
-    }
-    
-    /**
-     * Elimina un usuario (cambia su estado a inactivo)
-     * 
-     * @param int $id_usuario ID del usuario
-     * @return bool True si se eliminó correctamente
-     */
-    public function eliminar(int $id_usuario) {
-        return $this->actualizarEstado($id_usuario, ESTADO_INACTIVO);
-    }
-    
-    /**
-     * Obtiene todos los roles disponibles
-     * 
-     * @return array Lista de roles
-     */
-    public function obtenerRoles() {
-        try {
-            $sql = "SELECT id_rol, nombre_rol, descripcion FROM roles ORDER BY id_rol";
-            $stmt = executeQuery($sql);
-            return $stmt->fetchAll();
-            
-        } catch (PDOException $e) {
-            error_log("Error al obtener roles: " . $e->getMessage());
-            return [];
-        }
-    }
-    
-    /**
-     * Busca usuarios con filtros y paginación
-     * 
-     * @param array $filtros Filtros de búsqueda ['busqueda', 'rol', 'estado']
-     * @param int $limit Límite de resultados
-     * @param int $offset Offset para paginación
-     * @return array Lista de usuarios
-     */
-    public function buscar(array $filtros = [], int $limit = 50, int $offset = 0) {
-        try {
-            $sql = "SELECT u.id_usuario, u.nombre, u.apellido_paterno, u.apellido_materno, u.email, 
-                           u.id_rol, u.estado, u.fecha_registro,
-                           r.nombre_rol, r.descripcion as rol_descripcion,
-                           TRIM(CONCAT(u.nombre, ' ', u.apellido_paterno, IF(u.apellido_materno IS NOT NULL AND u.apellido_materno != '', CONCAT(' ', u.apellido_materno), ''))) as nombre_completo
-                    FROM usuarios u
-                    INNER JOIN roles r ON u.id_rol = r.id_rol
-                    WHERE 1=1";
-            
-            $params = [];
-            
-            // Filtro de búsqueda (nombre completo o email)
-            if (!empty($filtros['busqueda'])) {
-                $sql .= " AND (TRIM(CONCAT(u.nombre, ' ', u.apellido_paterno, IF(u.apellido_materno IS NOT NULL AND u.apellido_materno != '', CONCAT(' ', u.apellido_materno), ''))) LIKE :busqueda 
-                          OR u.email LIKE :busqueda 
-                          OR u.nombre LIKE :busqueda 
-                          OR u.apellido_paterno LIKE :busqueda)";
-                $params['busqueda'] = '%' . sanitizeInput($filtros['busqueda']) . '%';
-            }
-            
-            // Filtro por rol
-            if (!empty($filtros['rol'])) {
-                $idRol = validateInt($filtros['rol']);
-                if ($idRol) {
-                    $sql .= " AND u.id_rol = :id_rol";
-                    $params['id_rol'] = $idRol;
-                }
-            }
-            
-            // Filtro por estado
-            if (!empty($filtros['estado']) && in_array($filtros['estado'], [ESTADO_ACTIVO, ESTADO_INACTIVO])) {
-                $sql .= " AND u.estado = :estado";
-                $params['estado'] = $filtros['estado'];
-            }
-            
-            $sql .= " ORDER BY u.fecha_registro DESC LIMIT :limit OFFSET :offset";
-            $params['limit'] = $limit;
-            $params['offset'] = $offset;
-            
-            $stmt = executeQuery($sql, $params);
-            return $stmt->fetchAll();
-            
-        } catch (PDOException $e) {
-            error_log("Error al buscar usuarios: " . $e->getMessage());
-            return [];
-        }
-    }
-    
-    /**
-     * Cuenta usuarios con filtros
-     * 
-     * @param array $filtros Filtros de búsqueda
-     * @return int Total de usuarios
-     */
-    public function contarConFiltros(array $filtros = []) {
-        try {
-            $sql = "SELECT COUNT(*) as total FROM usuarios u WHERE 1=1";
-            $params = [];
-            
-            if (!empty($filtros['busqueda'])) {
-                $sql .= " AND (TRIM(CONCAT(u.nombre, ' ', u.apellido_paterno, IF(u.apellido_materno IS NOT NULL AND u.apellido_materno != '', CONCAT(' ', u.apellido_materno), ''))) LIKE :busqueda 
-                          OR u.email LIKE :busqueda 
-                          OR u.nombre LIKE :busqueda 
-                          OR u.apellido_paterno LIKE :busqueda)";
-                $params['busqueda'] = '%' . sanitizeInput($filtros['busqueda']) . '%';
-            }
-            
-            if (!empty($filtros['rol'])) {
-                $idRol = validateInt($filtros['rol']);
-                if ($idRol) {
-                    $sql .= " AND u.id_rol = :id_rol";
-                    $params['id_rol'] = $idRol;
-                }
-            }
-            
-            if (!empty($filtros['estado']) && in_array($filtros['estado'], [ESTADO_ACTIVO, ESTADO_INACTIVO])) {
-                $sql .= " AND u.estado = :estado";
-                $params['estado'] = $filtros['estado'];
-            }
-            
-            $stmt = executeQuery($sql, $params);
-            $resultado = $stmt->fetch();
-            
-            return (int) $resultado['total'];
-            
-        } catch (PDOException $e) {
-            error_log("Error al contar usuarios con filtros: " . $e->getMessage());
-            return 0;
-        }
+    public function obtenerEstadisticas()
+    {
+        $sql = "SELECT 
+                    COUNT(*) as total,
+                    SUM(CASE WHEN estado = 'activo' THEN 1 ELSE 0 END) as activos,
+                    SUM(CASE WHEN estado = 'inactivo' THEN 1 ELSE 0 END) as inactivos,
+                    SUM(CASE WHEN estado = 'suspendido' THEN 1 ELSE 0 END) as suspendidos
+                FROM " . self::TABLE;
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute();
+        
+        return $stmt->fetch(PDO::FETCH_ASSOC);
     }
 }
-
+?>

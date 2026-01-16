@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SDI - Gestión Documental</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Variables CSS para modo día (por defecto) - Mejorado para visibilidad */
+        :root {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f9fafb;
+            --bg-tertiary: #f3f4f6;
+            --text-primary: #111827;
+            --text-secondary: #374151;
+            --text-tertiary: #6b7280;
+            --border-color: #d1d5db;
+            --header-bg: #ffffff;
+            --header-text: #111827;
+            --header-border: #e5e7eb;
+            --card-bg: #ffffff;
+            --card-border: #e5e7eb;
+            --icon-color: #374151;
+            --icon-hover: #111827;
+            --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+
+        /* Variables CSS para modo noche (Windows 11 style) */
+        [data-theme="dark"] {
+            --bg-primary: #202020;
+            --bg-secondary: #1a1a1a;
+            --bg-tertiary: #2d2d2d;
+            --text-primary: #ffffff;
+            --text-secondary: #d4d4d4;
+            --text-tertiary: #a3a3a3;
+            --border-color: #3d3d3d;
+            --header-bg: #2d2d2d;
+            --header-text: #ffffff;
+            --header-border: #3d3d3d;
+            --card-bg: #2d2d2d;
+            --card-border: #3d3d3d;
+            --icon-color: #d4d4d4;
+            --icon-hover: #ffffff;
+            --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.3), 0 1px 2px 0 rgba(0, 0, 0, 0.2);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Aplicar variables a elementos */
+        body {
+            background-color: var(--bg-secondary);
+            color: var(--text-primary);
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        header {
+            background-color: var(--header-bg) !important;
+            border-bottom-color: var(--header-border) !important;
+            color: var(--header-text) !important;
+        }
+
+        header h1, header p {
+            color: var(--header-text) !important;
+        }
+
+        /* Toggle de tema */
+        .theme-toggle {
+            position: relative;
+            width: 60px;
+            height: 32px;
+            background-color: var(--bg-tertiary);
+            border: 2px solid var(--border-color);
+            border-radius: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            padding: 2px;
+        }
+
+        .theme-toggle:hover {
+            border-color: var(--text-secondary);
+        }
+
+        .theme-toggle-icon {
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background-color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.3s ease, background-color 0.3s ease;
+            color: var(--bg-primary);
+            font-size: 12px;
+        }
+
+        [data-theme="dark"] .theme-toggle-icon {
+            transform: translateX(28px);
+            background-color: #ffd700;
+            color: #202020;
+        }
+
+        [data-theme="dark"] .theme-toggle {
+            background-color: #3d3d3d;
+            border-color: #4d4d4d;
+        }
+
+        /* Asegurar legibilidad de textos e iconos */
+        .text-gray-800, .text-gray-700, .text-gray-600 {
+            color: var(--text-primary) !important;
+        }
+
+        .text-gray-500 {
+            color: var(--text-secondary) !important;
+        }
+
+        .text-gray-400 {
+            color: var(--text-tertiary) !important;
+        }
+
+        /* Iconos visibles en ambos modos - Mejorado para modo claro */
+        /* En modo claro, iconos más oscuros para mejor visibilidad */
+        :root i:not(.text-white):not(.text-blue-500):not(.text-red-600):not(.text-green-600):not(.text-yellow-600):not(.text-purple-600),
+        :root .fas:not(.text-white):not(.text-blue-500):not(.text-red-600):not(.text-green-600):not(.text-yellow-600):not(.text-purple-600),
+        :root .far:not(.text-white):not(.text-blue-500):not(.text-red-600):not(.text-green-600):not(.text-yellow-600):not(.text-purple-600),
+        :root .fal:not(.text-white):not(.text-blue-500):not(.text-red-600):not(.text-green-600):not(.text-yellow-600):not(.text-purple-600),
+        :root .fab:not(.text-white):not(.text-blue-500):not(.text-red-600):not(.text-green-600):not(.text-yellow-600):not(.text-purple-600) {
+            color: #374151 !important;
+        }
+
+        /* En modo oscuro, iconos más claros */
+        [data-theme="dark"] i:not(.text-white):not(.text-blue-500):not(.text-red-600):not(.text-green-600):not(.text-yellow-600):not(.text-purple-600),
+        [data-theme="dark"] .fas:not(.text-white):not(.text-blue-500):not(.text-red-600):not(.text-green-600):not(.text-yellow-600):not(.text-purple-600),
+        [data-theme="dark"] .far:not(.text-white):not(.text-blue-500):not(.text-red-600):not(.text-green-600):not(.text-yellow-600):not(.text-purple-600),
+        [data-theme="dark"] .fal:not(.text-white):not(.text-blue-500):not(.text-red-600):not(.text-green-600):not(.text-yellow-600):not(.text-purple-600),
+        [data-theme="dark"] .fab:not(.text-white):not(.text-blue-500):not(.text-red-600):not(.text-green-600):not(.text-yellow-600):not(.text-purple-600) {
+            color: #d4d4d4 !important;
+        }
+
+        /* Botones y enlaces con iconos - heredan color del botón */
+        button i, a i {
+            color: inherit !important;
+        }
+
+        /* Iconos en botones de acción específicos mantienen su color */
+        button.text-blue-600 i,
+        button.text-red-600 i,
+        button.text-green-600 i,
+        button.text-yellow-600 i,
+        button.text-purple-600 i,
+        .text-blue-500 i,
+        .text-blue-600 i {
+            color: inherit !important;
+        }
+
+        /* Cards y contenedores */
+        .bg-white {
+            background-color: var(--card-bg) !important;
+        }
+
+        .bg-gray-50 {
+            background-color: var(--bg-secondary) !important;
+        }
+
+        .border-gray-200, .border-gray-300 {
+            border-color: var(--border-color) !important;
+        }
+
+        /* Mejorar centrado del contenido */
+        #contenido {
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Asegurar que el contenido esté centrado */
+        section.flex-1 {
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+        }
+
+        /* Transiciones suaves para cambios de tema */
+        * {
+            transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+        }
+
+        /* Mejorar visibilidad de iconos en módulos del dashboard */
+        /* Iconos blancos en módulos azules (tarjetas de módulos) */
+        .from-blue-500 .fa-chart-line,
+        .from-blue-500 .fa-users,
+        .from-blue-500 .fa-file-alt,
+        .from-blue-500 .fa-folder,
+        .from-blue-500 .fa-tags,
+        .from-blue-500 .fa-user-circle,
+        .to-blue-600 .fa-chart-line,
+        .to-blue-600 .fa-users,
+        .to-blue-600 .fa-file-alt,
+        .to-blue-600 .fa-folder,
+        .to-blue-600 .fa-tags,
+        .to-blue-600 .fa-user-circle {
+            color: #ffffff !important;
+            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Aumentar opacidad del fondo del círculo de icono al pasar el ratón */
+        .bg-opacity-35:hover {
+            background-color: rgba(255, 255, 255, 0.45) !important;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Header Superior - Siempre visible -->
+    <header class="shadow-md sticky top-0 z-30" style="background-color: var(--header-bg); border-bottom: 1px solid var(--header-border);">
+        <div class="flex items-center justify-between p-4 md:p-6">
+            <!-- Logo y Título -->
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-folder-open text-white text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-bold" style="color: var(--header-text);">SDI</h1>
+                    <p class="text-sm" style="color: var(--text-secondary);">Gestión Documental</p>
+                </div>
+            </div>
+
+            <!-- Botón Volver (solo visible fuera del dashboard) -->
+            <div id="backButtonContainer" class="hidden">
+                <button onclick="navegacionModule.volverAtras()" class="flex items-center space-x-2 px-4 py-2 rounded-lg transition font-medium" style="color: var(--text-primary); background-color: var(--bg-tertiary); border: 1px solid var(--border-color);" onmouseover="this.style.backgroundColor='var(--bg-secondary)'; this.style.borderColor='var(--icon-color)'" onmouseout="this.style.backgroundColor='var(--bg-tertiary)'; this.style.borderColor='var(--border-color)'" title="Volver">
+                    <i class="fas fa-arrow-left" style="color: var(--icon-color);"></i>
+                    <span class="hidden md:inline">Volver</span>
+                </button>
+            </div>
+
+            <!-- User Info, Toggle Tema y Cerrar Sesión -->
+            <div class="flex items-center space-x-4">
+                <!-- Toggle Modo Día/Noche -->
+                <button onclick="toggleTheme()" class="theme-toggle" id="themeToggle" title="Cambiar tema">
+                    <div class="theme-toggle-icon">
+                        <i class="fas fa-sun" id="themeIcon" style="color: inherit !important;"></i>
+                    </div>
+                </button>
+                
+                <button onclick="cargarModulo('perfil')" class="flex items-center space-x-2 px-4 py-2 rounded-lg transition" style="color: var(--text-primary); background-color: transparent;" onmouseover="this.style.backgroundColor='var(--bg-tertiary)'" onmouseout="this.style.backgroundColor='transparent'" title="Mi Perfil">
+                    <div class="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-xs" id="usuarioInicialHeader">
+                        H
+                    </div>
+                    <div class="text-left hidden md:block">
+                        <p class="text-base font-medium" id="usuarioNombreHeader" style="color: var(--text-primary);"></p>
+                        <p class="text-sm" id="usuarioRolHeader" style="color: var(--text-secondary);"></p>
+                    </div>
+                </button>
+                <button onclick="cerrarSesion()" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition font-semibold text-base" title="Cerrar Sesión">
+                    Cerrar Sesión
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex flex-col min-h-screen">
+
+        <!-- Content Area - Centrado -->
+        <section class="flex-1 overflow-y-auto" style="background-color: var(--bg-secondary); scroll-behavior: smooth;">
+            <div class="flex items-center justify-center min-h-[calc(100vh-80px)] py-8 px-4 md:px-8">
+                <div id="contenido" class="w-full max-w-7xl">
+                    <div class="flex justify-center items-center h-64">
+                        <div class="text-center">
+                            <i class="fas fa-spinner fa-spin text-4xl text-blue-500 mb-4"></i>
+                            <p style="color: var(--text-primary);">Cargando aplicación...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Toast Container -->
+    <div id="toastContainer" class="fixed top-4 right-4 space-y-2 z-50 max-w-sm"></div>
+
+    <!-- Scripts -->
+    <script src="/Programa-Gestion-SDI/public/js/api.js"></script>
+    <script src="/Programa-Gestion-SDI/public/js/auth.js"></script>
+    <script src="/Programa-Gestion-SDI/public/js/ui.js"></script>
+    <script src="/Programa-Gestion-SDI/public/js/modules/navegacion.js"></script>
+    <script src="/Programa-Gestion-SDI/public/js/modules/usuarios.js"></script>
+    <script src="/Programa-Gestion-SDI/public/js/app.js"></script>
+
+    <script>
+        /**
+         * Inicializar cuando el DOM está listo
+         */
+        document.addEventListener('DOMContentLoaded', initApp);
+
+        /**
+         * Cerrar sesión
+         */
+        async function cerrarSesion() {
+            if (confirm('¿Desea cerrar sesión?')) {
+                try {
+                    await auth.logout();
+                    window.location.href = '/Programa-Gestion-SDI/login.html';
+                } catch (error) {
+                    console.error('Error al cerrar sesión:', error);
+                    // Redirigir de todas formas
+                    window.location.href = '/Programa-Gestion-SDI/login.html';
+                }
+            }
+        }
+
+        /**
+         * Inicializar tema desde localStorage o preferencia del sistema
+         */
+        function initTheme() {
+            // Verificar si hay un tema guardado
+            let savedTheme = localStorage.getItem('theme');
+            
+            // Si no hay tema guardado, usar preferencia del sistema
+            if (!savedTheme) {
+                const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                savedTheme = prefersDark ? 'dark' : 'light';
+            }
+            
+            document.documentElement.setAttribute('data-theme', savedTheme);
+            updateThemeIcon(savedTheme);
+        }
+
+        /**
+         * Cambiar entre modo día y noche
+         */
+        function toggleTheme() {
+            const currentTheme = document.documentElement.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            
+            document.documentElement.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            updateThemeIcon(newTheme);
+        }
+
+        /**
+         * Actualizar icono del tema
+         */
+        function updateThemeIcon(theme) {
+            const icon = document.getElementById('themeIcon');
+            if (icon) {
+                icon.className = theme === 'dark' ? 'fas fa-moon' : 'fas fa-sun';
+            }
+        }
+
+        /**
+         * Actualizar información de usuario en header
+         */
+        function actualizarUserInfo() {
+            if (auth.usuario) {
+                const nombre = auth.usuario.nombre + ' ' + auth.usuario.apellidos;
+                const rol = auth.usuario.rol;
+                const inicial = (auth.usuario.nombre || '').charAt(0).toUpperCase();
+                
+                document.getElementById('usuarioNombreHeader').textContent = nombre;
+                document.getElementById('usuarioRolHeader').textContent = rol;
+                
+                const inicialHeader = document.getElementById('usuarioInicialHeader');
+                if (inicialHeader) {
+                    inicialHeader.textContent = inicial;
+                }
+            }
+        }
+
+        // Inicializar tema al cargar
+        initTheme();
+    </script>
+</body>
+</html>

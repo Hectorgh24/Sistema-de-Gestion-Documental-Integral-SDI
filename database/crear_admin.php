@@ -7,9 +7,8 @@
  */
 
 require_once __DIR__ . '/../config/autoload.php';
-require_once __DIR__ . '/../models/Usuario.php';
 
-$usuarioModel = new Usuario();
+$usuarioModel = new \App\Models\Usuario();
 
 // Datos del administrador (CAMBIAR ESTOS VALORES)
 $datosAdmin = [

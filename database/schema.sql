@@ -37,7 +37,7 @@ CREATE TABLE roles (
 CREATE TABLE usuarios (
     id_usuario INT AUTO_INCREMENT PRIMARY KEY,
     id_rol INT NOT NULL,
-    nombres VARCHAR(60) NOT NULL,          -- Ej: "Juan Carlos"
+    nombre VARCHAR(60) NOT NULL,           -- Ej: "Juan Carlos"
     apellido_paterno VARCHAR(60) NOT NULL, -- Ej: "Pérez"
     apellido_materno VARCHAR(60) NULL,     -- Ej: "López" (Nullable por casos extranjeros)
     email VARCHAR(100) NOT NULL UNIQUE,
@@ -166,7 +166,7 @@ INSERT INTO roles (nombre_rol, descripcion) VALUES
 
 -- 5.2 Usuario Admin (Ejemplo con nombre atomizado)
 -- Password dummy, en producción usar BCRYPT o ARGON2
-INSERT INTO usuarios (id_rol, nombres, apellido_paterno, apellido_materno, email, password_hash) VALUES
+INSERT INTO usuarios (id_rol, nombre, apellido_paterno, apellido_materno, email, password_hash) VALUES
 (1, 'Héctor', 'González', 'Hernández', 'admin@sdi.com', 'hashed_secret_password_123');
 
 -- 5.3 Categoría Base: Auditoría

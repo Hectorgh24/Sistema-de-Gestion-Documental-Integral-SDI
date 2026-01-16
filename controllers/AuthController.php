@@ -1,184 +1,276 @@
 <?php
+namespace App\Controllers;
+
+use App\Models\Usuario;
+use App\Middleware\Autenticacion;
+
 /**
- * Controlador de Autenticación - SDI Gestión Documental
- * Maneja login, logout y validación de sesiones
+ * Controller: AuthController
  * 
- * Seguridad: Validación doble (cliente y servidor), protección CSRF
+ * Gestiona el flujo de autenticación:
+ * - Login
+ * - Logout
+ * - Validación de credenciales
+ * 
+ * @author SDI Development Team
+ * @version 2.0
  */
+class AuthController
+{
+    protected $usuarioModel;
 
-require_once __DIR__ . '/../config/autoload.php';
-require_once __DIR__ . '/../models/Usuario.php';
-
-class AuthController {
-    private $usuarioModel;
-    
-    public function __construct() {
+    /**
+     * Constructor
+     */
+    public function __construct()
+    {
         $this->usuarioModel = new Usuario();
     }
-    
+
     /**
-     * Muestra el formulario de login
-     */
-    public function mostrarLogin() {
-        // Si ya está autenticado, redirigir al dashboard
-        if (isAuthenticated()) {
-            $this->redirigirSegunRol();
-            return;
-        }
-        
-        $error = getGet('error', '');
-        $mensaje = getGet('mensaje', '');
-        
-        require_once __DIR__ . '/../views/auth/login.php';
-    }
-    
-    /**
-     * Procesa el login
-     */
-    public function procesarLogin() {
-        // Verificar método POST
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            header('Location: /login.php');
-            exit;
-        }
-        
-        // Validación del lado del servidor (autoridad final)
-        $errores = $this->validarLogin();
-        
-        if (!empty($errores)) {
-            $_SESSION['error_login'] = $errores;
-            header('Location: /login.php?error=' . urlencode(implode(', ', $errores)));
-            exit;
-        }
-        
-        // Obtener y sanitizar datos
-        $email = getPost('email');
-        $password = getPost('password');
-        
-        // Verificar credenciales
-        $usuario = $this->usuarioModel->verificarCredenciales($email, $password);
-        
-        if (!$usuario) {
-            // No revelar si el email existe o no (seguridad)
-            $_SESSION['error_login'] = ['Credenciales inválidas'];
-            header('Location: /login.php?error=' . urlencode('Credenciales inválidas'));
-            exit;
-        }
-        
-        // Login exitoso - Regenerar ID de sesión (prevenir Session Fixation)
-        regenerateSessionId();
-        
-        // Establecer datos de sesión
-        $_SESSION['usuario_id'] = $usuario['id_usuario'];
-        $_SESSION['usuario_nombre'] = $usuario['nombre_completo'];
-        $_SESSION['usuario_email'] = $usuario['email'];
-        $_SESSION['usuario_rol'] = $usuario['nombre_rol'];
-        $_SESSION['usuario_id_rol'] = $usuario['id_rol'];
-        $_SESSION['login_time'] = time();
-        
-        // Redirigir según el rol
-        $this->redirigirSegunRol();
-    }
-    
-    /**
-     * Valida los datos del formulario de login
+     * Procesar login
      * 
-     * @return array Array de errores (vacío si no hay errores)
-     */
-    private function validarLogin(): array {
-        $errores = [];
-        
-        // Validar email
-        $email = getPost('email');
-        if (empty($email)) {
-            $errores[] = 'El email es requerido';
-        } elseif (!validateEmail($email)) {
-            $errores[] = 'El email no es válido';
-        }
-        
-        // Validar contraseña
-        $password = getPost('password');
-        if (empty($password)) {
-            $errores[] = 'La contraseña es requerida';
-        } elseif (strlen($password) < 6) {
-            $errores[] = 'La contraseña debe tener al menos 6 caracteres';
-        }
-        
-        return $errores;
-    }
-    
-    /**
-     * Redirige al usuario según su rol
-     */
-    private function redirigirSegunRol() {
-        if (!isset($_SESSION['usuario_rol'])) {
-            header('Location: /login.php');
-            exit;
-        }
-        
-        $rol = $_SESSION['usuario_rol'];
-        
-        switch ($rol) {
-            case ROL_ADMINISTRADOR:
-                header('Location: /dashboard.php');
-                break;
-            case ROL_ACADEMICO:
-                header('Location: /dashboard.php');
-                break;
-            case ROL_ALUMNO:
-                header('Location: /dashboard.php');
-                break;
-            default:
-                header('Location: /login.php');
-        }
-        exit;
-    }
-    
-    /**
-     * Cierra la sesión del usuario
-     */
-    public function logout() {
-        startSecureSession();
-        
-        // Destruir todas las variables de sesión
-        $_SESSION = [];
-        
-        // Destruir la cookie de sesión
-        if (ini_get("session.use_cookies")) {
-            $params = session_get_cookie_params();
-            setcookie(session_name(), '', time() - 42000,
-                $params["path"], $params["domain"],
-                $params["secure"], $params["httponly"]
-            );
-        }
-        
-        // Destruir la sesión
-        session_destroy();
-        
-        // Redirigir al login
-        header('Location: /login.php?mensaje=' . urlencode('Sesión cerrada correctamente'));
-        exit;
-    }
-    
-    /**
-     * Verifica si el usuario está autenticado y tiene el rol requerido
+     * Recibe POST con email y password
+     * Valida credenciales contra base de datos
+     * Crea sesión si es correcto
      * 
-     * @param string|array|null $roles Rol o roles permitidos (null = cualquier rol autenticado)
-     * @return bool True si está autenticado y tiene el rol
+     * @return void JSON response
      */
-    public function verificarAcceso($roles = null): bool {
-        if (!isAuthenticated()) {
-            return false;
+    public function login()
+    {
+        try {
+            logger("=== INICIO PROCESO LOGIN ===", 'DEBUG');
+            
+            // Validar método HTTP
+            if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+                logger("Método HTTP inválido: " . $_SERVER['REQUEST_METHOD'], 'WARNING');
+                response(false, 'Método no permitido', null, 405);
+            }
+
+            // Obtener datos JSON del body
+            $rawInput = file_get_contents('php://input');
+            logger("Raw input recibido: " . strlen($rawInput) . " bytes", 'DEBUG');
+            
+            $input = json_decode($rawInput, true);
+            
+            if (!$input) {
+                $jsonError = json_last_error_msg();
+                logger("Error decodificando JSON: $jsonError", 'ERROR', ['raw' => substr($rawInput, 0, 100)]);
+                response(false, 'Datos inválidos (JSON inválido)', null, 400);
+            }
+
+            // Validar campos requeridos
+            $email = trim($input['email'] ?? '');
+            $password = $input['password'] ?? '';
+
+            logger("Intento de login con email: $email", 'DEBUG');
+
+            if (empty($email) || empty($password)) {
+                logger("Campos faltantes - email: " . (empty($email) ? 'VACIO' : 'OK') . ", password: " . (empty($password) ? 'VACIO' : 'OK'), 'WARNING');
+                response(false, 'Email y contraseña son requeridos', null, 400);
+            }
+
+            // Validar formato de email
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                logger("Formato de email inválido: $email", 'WARNING');
+                response(false, 'Formato de email inválido', null, 400);
+            }
+
+            // Buscar usuario por email
+            logger("Buscando usuario en BD con email: $email", 'DEBUG');
+            $usuario = $this->usuarioModel->obtenerPorEmail(strtolower($email));
+
+            if (!$usuario) {
+                logger("Usuario NO encontrado en BD: $email", 'WARNING');
+                response(false, 'Email o contraseña incorrectos', null, 401);
+            }
+
+            logger("Usuario encontrado en BD - ID: " . ($usuario['id_usuario'] ?? 'NULL') . ", Estado: " . ($usuario['estado'] ?? 'NULL'), 'DEBUG');
+
+            // Verificar que el usuario esté activo
+            if ($usuario['estado'] !== 'activo') {
+                logger("Usuario inactivo o suspendido: $email (Estado: " . ($usuario['estado'] ?? 'NULL') . ")", 'WARNING');
+                response(false, 'Usuario inactivo o suspendido', null, 403);
+            }
+
+            // Verificar contraseña
+            logger("Verificando contraseña del usuario", 'DEBUG');
+            if (!password_verify($password, $usuario['password_hash'] ?? '')) {
+                logger("Contraseña incorrecta para usuario: $email", 'WARNING');
+                response(false, 'Email o contraseña incorrectos', null, 401);
+            }
+
+            logger("✓ Contraseña verificada correctamente", 'DEBUG');
+
+            // Iniciar sesión
+            logger("Iniciando sesión para usuario: $email", 'DEBUG');
+            Autenticacion::iniciar($usuario);
+            logger("✓ Sesión iniciada correctamente", 'DEBUG');
+
+            // Retornar datos del usuario (sin contraseña)
+            $datosUsuario = [
+                'id_usuario' => $usuario['id_usuario'] ?? null,
+                'email' => $usuario['email'] ?? '',
+                'nombre' => $usuario['nombre'] ?? '',
+                'apellidos' => ($usuario['apellido_paterno'] ?? '') . 
+                             (!empty($usuario['apellido_materno']) ? ' ' . $usuario['apellido_materno'] : ''),
+                'rol' => $usuario['nombre_rol'] ?? ''
+            ];
+
+            logger("Login exitoso para usuario: $email", 'INFO', ['usuario_id' => $datosUsuario['id_usuario'], 'rol' => $datosUsuario['rol']]);
+            response(true, 'Login exitoso', $datosUsuario, 200);
+
+        } catch (\Exception $e) {
+            logger("Error en login: " . $e->getMessage(), 'ERROR', [
+                'exception' => get_class($e),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            response(false, 'Error en el servidor: ' . $e->getMessage(), null, 500);
+        } catch (\Throwable $e) {
+            logger("Error fatal en login: " . $e->getMessage(), 'ERROR', [
+                'exception' => get_class($e),
+                'file' => $e->getFile(),
+                'line' => $e->getLine()
+            ]);
+            response(false, 'Error crítico en el servidor', null, 500);
         }
-        
-        if ($roles === null) {
-            return true;
+    }
+
+    /**
+     * Verificar si usuario está autenticado
+     * 
+     * @return void JSON response
+     */
+    public function verificar()
+    {
+        try {
+            logger("=== INICIO VERIFICACIÓN DE AUTENTICACIÓN ===", 'DEBUG');
+            logger("REQUEST_METHOD: " . $_SERVER['REQUEST_METHOD'], 'DEBUG');
+            logger("Session ID: " . session_id(), 'DEBUG');
+            logger("Session data: " . json_encode($_SESSION ?? []), 'DEBUG');
+            
+            $verificado = Autenticacion::verificar();
+            logger("Resultado de verificación: " . ($verificado ? 'TRUE' : 'FALSE'), 'DEBUG');
+            
+            if (!$verificado) {
+                logger("Usuario NO autenticado - retornando 401", 'DEBUG');
+                response(false, 'No autenticado', null, 401);
+            }
+
+            $usuario = Autenticacion::usuario();
+            logger("Usuario autenticado - ID: " . ($usuario['id_usuario'] ?? 'NULL') . ", Email: " . ($usuario['email'] ?? 'NULL'), 'DEBUG');
+            response(true, 'Autenticado', $usuario, 200);
+
+        } catch (\Exception $e) {
+            logger("Error verificando autenticación: " . $e->getMessage(), 'ERROR', [
+                'exception' => get_class($e),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            response(false, 'Error en el servidor: ' . $e->getMessage(), null, 500);
+        } catch (\Throwable $e) {
+            logger("Error fatal verificando autenticación: " . $e->getMessage(), 'ERROR', [
+                'exception' => get_class($e),
+                'file' => $e->getFile(),
+                'line' => $e->getLine()
+            ]);
+            response(false, 'Error crítico en el servidor', null, 500);
         }
-        
-        $rolesPermitidos = is_array($roles) ? $roles : [$roles];
-        $rolUsuario = $_SESSION['usuario_rol'] ?? '';
-        
-        return in_array($rolUsuario, $rolesPermitidos);
+    }
+
+    /**
+     * Procesar logout
+     * 
+     * @return void JSON response
+     */
+    public function logout()
+    {
+        try {
+            Autenticacion::cerrar();
+            response(true, 'Sesión cerrada', null, 200);
+
+        } catch (\Exception $e) {
+            logger("Error en logout: " . $e->getMessage(), 'ERROR');
+            response(false, 'Error en el servidor', null, 500);
+        }
+    }
+
+    /**
+     * Obtener datos del usuario autenticado
+     * 
+     * @return void JSON response
+     */
+    public function perfil()
+    {
+        try {
+            Autenticacion::requerirAutenticacion();
+
+            $usuario = Autenticacion::usuario();
+            response(true, 'Datos del usuario', $usuario, 200);
+
+        } catch (\Exception $e) {
+            logger("Error obteniendo perfil: " . $e->getMessage(), 'ERROR');
+            response(false, 'Error en el servidor', null, 500);
+        }
+    }
+
+    /**
+     * Cambiar contraseña del usuario autenticado
+     * 
+     * @return void JSON response
+     */
+    public function cambiarPassword()
+    {
+        try {
+            // Verificar autenticación
+            Autenticacion::requerirAutenticacion();
+
+            // Validar método HTTP
+            if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+                response(false, 'Método no permitido', null, 405);
+            }
+
+            $input = json_decode(file_get_contents('php://input'), true);
+
+            if (!$input) {
+                response(false, 'Datos inválidos', null, 400);
+            }
+
+            $password_actual = $input['password_actual'] ?? '';
+            $password_nueva = $input['password_nueva'] ?? '';
+            $password_confirma = $input['password_confirma'] ?? '';
+
+            // Validaciones
+            if (empty($password_actual) || empty($password_nueva) || empty($password_confirma)) {
+                response(false, 'Todos los campos son requeridos', null, 400);
+            }
+
+            if ($password_nueva !== $password_confirma) {
+                response(false, 'Las contraseñas nuevas no coinciden', null, 400);
+            }
+
+            if (strlen($password_nueva) < 8) {
+                response(false, 'La contraseña debe tener al menos 8 caracteres', null, 400);
+            }
+
+            if ($password_actual === $password_nueva) {
+                response(false, 'La nueva contraseña no puede ser igual a la actual', null, 400);
+            }
+
+            // Cambiar contraseña
+            $id_usuario = Autenticacion::getId();
+            $this->usuarioModel->cambiarPassword($id_usuario, $password_actual, $password_nueva);
+
+            logger("Usuario cambió contraseña: " . Autenticacion::getEmail(), 'INFO');
+            response(true, 'Contraseña actualizada exitosamente', null, 200);
+
+        } catch (\Exception $e) {
+            logger("Error cambiar password: " . $e->getMessage(), 'ERROR');
+            response(false, $e->getMessage(), null, 400);
+        }
     }
 }
-
+?>

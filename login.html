@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Iniciar Sesión - SDI Gestión Documental</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-gradient-to-br from-blue-500 to-blue-700 min-h-screen flex items-center justify-center">
+    <div class="w-full max-w-md">
+        <!-- Logo/Header -->
+        <div class="text-center mb-8">
+            <div class="inline-flex items-center justify-center w-16 h-16 bg-white rounded-full mb-4">
+                <i class="fas fa-folder-open text-2xl text-blue-600"></i>
+            </div>
+            <h1 class="text-3xl font-bold text-white">SDI</h1>
+            <p class="text-blue-100 mt-2">Gestión Documental</p>
+        </div>
+
+        <!-- Formulario de Login -->
+        <div class="bg-white rounded-lg shadow-xl p-8">
+            <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">Iniciar Sesión</h2>
+
+            <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-4">
+                <!-- Email -->
+                <div>
+                    <label for="email" class="block text-sm font-medium text-gray-700 mb-2">
+                        <i class="fas fa-envelope mr-2"></i>Correo Electrónico
+                    </label>
+                    <input 
+                        type="email" 
+                        id="email" 
+                        required 
+                        placeholder="correo@ejemplo.com"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                    >
+                </div>
+
+                <!-- Contraseña -->
+                <div>
+                    <label for="password" class="block text-sm font-medium text-gray-700 mb-2">
+                        <i class="fas fa-lock mr-2"></i>Contraseña
+                    </label>
+                    <input 
+                        type="password" 
+                        id="password" 
+                        required 
+                        placeholder="••••••••"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                    >
+                </div>
+
+                <!-- Recuerdame -->
+                <div class="flex items-center">
+                    <input type="checkbox" id="remember" class="w-4 h-4 text-blue-600 rounded">
+                    <label for="remember" class="ml-2 text-sm text-gray-600">Recuérdame en este dispositivo</label>
+                </div>
+
+                <!-- Botón Login -->
+                <button 
+                    type="submit" 
+                    id="loginBtn"
+                    class="w-full py-3 px-4 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition flex items-center justify-center space-x-2"
+                >
+                    <span id="btnText">Iniciar Sesión</span>
+                    <i id="btnIcon" class="fas fa-arrow-right"></i>
+                </button>
+            </form>
+
+            <!-- Divider -->
+            <div class="mt-6 mb-6 border-t border-gray-200"></div>
+
+            <!-- Información adicional -->
+            <div class="text-center text-sm text-gray-600">
+                <p class="mb-2">¿Problemas para acceder?</p>
+                <a href="#" class="text-blue-600 hover:text-blue-700 font-medium">Contactar Administrador</a>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="text-center mt-8 text-blue-100 text-sm">
+            <p>&copy; 2024 SDI - Gestión Documental. Todos los derechos reservados.</p>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toastContainer" class="fixed top-4 right-4 space-y-2 z-50"></div>
+
+    <!-- Scripts -->
+    <script src="/Programa-Gestion-SDI/public/js/api.js"></script>
+    <script src="/Programa-Gestion-SDI/public/js/auth.js"></script>
+    <script src="/Programa-Gestion-SDI/public/js/ui.js"></script>
+
+    <script>
+        /**
+         * Validar que el usuario ya esté autenticado
+         */
+        window.addEventListener('load', async () => {
+            try {
+                console.log('[LOGIN] Verificando si usuario ya está autenticado...');
+                const autenticado = await auth.verificar();
+                console.log('[LOGIN] Resultado de verificación inicial:', autenticado);
+                
+                if (autenticado) {
+                    console.log('[LOGIN] Usuario ya autenticado, redirigiendo...');
+                    window.location.href = '/Programa-Gestion-SDI/index.html';
+                } else {
+                    console.log('[LOGIN] Usuario no autenticado, mostrando formulario');
+                }
+            } catch (error) {
+                console.error('[LOGIN] Error al verificar autenticación inicial:', error);
+                // No redirigir si hay error, permitir que el usuario intente login
+            }
+        });
+
+        /**
+         * Manejar envío del formulario de login
+         */
+        async function handleLogin(event) {
+            event.preventDefault();
+
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const loginBtn = document.getElementById('loginBtn');
+            const btnText = document.getElementById('btnText');
+            const btnIcon = document.getElementById('btnIcon');
+
+            // Deshabilitar botón y mostrar carga
+            loginBtn.disabled = true;
+            btnText.textContent = 'Procesando...';
+            btnIcon.className = 'fas fa-spinner fa-spin';
+
+            try {
+                console.log('[LOGIN] Iniciando proceso de login...');
+                console.log('[LOGIN] Email:', email);
+                
+                const resultado = await auth.login(email, password);
+                
+                console.log('[LOGIN] Resultado recibido:', resultado);
+
+                if (resultado && resultado.success) {
+                    console.log('[LOGIN] Login exitoso, verificando sesión...');
+                    
+                    // Verificar que la sesión se creó correctamente
+                    const verificacion = await auth.verificar();
+                    
+                    console.log('[LOGIN] Resultado de verificación:', verificacion);
+                    
+                    if (verificacion) {
+                        ui.toast('Bienvenido a SDI', 'success');
+                        setTimeout(() => {
+                            window.location.href = '/Programa-Gestion-SDI/index.html';
+                        }, 500);
+                    } else {
+                        console.error('[LOGIN] Error: Login exitoso pero verificación falló');
+                        ui.toast('Error de sesión: La sesión no se creó correctamente', 'error');
+                        loginBtn.disabled = false;
+                        btnText.textContent = 'Iniciar Sesión';
+                        btnIcon.className = 'fas fa-arrow-right';
+                    }
+                } else {
+                    const mensajeError = resultado?.message || 'Error en las credenciales';
+                    console.error('[LOGIN] Error en login:', {
+                        success: resultado?.success,
+                        message: mensajeError,
+                        status: resultado?.status,
+                        data: resultado?.data
+                    });
+                    
+                    ui.toast(mensajeError, 'error');
+                    loginBtn.disabled = false;
+                    btnText.textContent = 'Iniciar Sesión';
+                    btnIcon.className = 'fas fa-arrow-right';
+                }
+            } catch (error) {
+                console.error('[LOGIN] Excepción capturada:', {
+                    message: error?.message,
+                    stack: error?.stack,
+                    status: error?.status,
+                    data: error?.data,
+                    name: error?.name
+                });
+                
+                // Mostrar mensaje de error más detallado
+                let mensajeError = 'Error al conectar con el servidor';
+                
+                if (error?.message) {
+                    mensajeError = error.message;
+                } else if (error?.data?.message) {
+                    mensajeError = error.data.message;
+                }
+                
+                // Si hay información adicional, mostrarla en consola
+                if (error?.status) {
+                    console.error(`[LOGIN] Status HTTP: ${error.status}`);
+                }
+                
+                ui.toast(mensajeError, 'error');
+                loginBtn.disabled = false;
+                btnText.textContent = 'Iniciar Sesión';
+                btnIcon.className = 'fas fa-arrow-right';
+            }
+        }
+
+        /**
+         * Permitir enter en el formulario
+         */
+        document.getElementById('password').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                document.getElementById('loginForm').dispatchEvent(new Event('submit'));
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,68 +1,84 @@
-# Configuración Apache para SDI Gestión Documental
-# Compatible con InfinityFree
+# SDI - Gestión Documental: Configuración de Seguridad y Reescritura de URLs
+# Requiere mod_rewrite habilitado en Apache
 
-# Habilitar motor de reescritura
-RewriteEngine On
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /Programa-Gestion-SDI/
+    
+    # No procesar archivos y directorios reales
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    
+    # Redirigir todas las rutas /api/* al router.php
+    RewriteRule ^api/(.*)$ router.php [QSA,L]
+</IfModule>
 
-# Proteger archivos sensibles
-<FilesMatch "\.(htaccess|htpasswd|ini|log|sh|sql)$">
-    Order Allow,Deny
-    Deny from all
+# 1. SEGURIDAD: Bloquear acceso a archivos y carpetas sensibles
+<FilesMatch "\.(htaccess|htpasswd|ini|log|sh|sql|env)$">
+    Require all denied
 </FilesMatch>
 
-# Proteger directorio config
-<DirectoryMatch "^.*/config/">
-    Order Allow,Deny
-    Deny from all
-</DirectoryMatch>
+# Bloquear acceso a carpetas sensibles
+<IfModule mod_rewrite.c>
+    # Bloquear acceso web directo solo a las carpetas críticas
+    RewriteRule ^(config|models|controllers|middleware|services|database)/ - [F,L]
+</IfModule>
 
-# Proteger directorio helpers
-<DirectoryMatch "^.*/helpers/">
-    Order Allow,Deny
-    Deny from all
-</DirectoryMatch>
-
-# Proteger directorio models
-<DirectoryMatch "^.*/models/">
-    Order Allow,Deny
-    Deny from all
-</DirectoryMatch>
-
-# Proteger directorio controllers
-<DirectoryMatch "^.*/controllers/">
-    Order Allow,Deny
-    Deny from all
-</DirectoryMatch>
-
-# Proteger directorio database (excepto crear_admin.php si es necesario)
-# NOTA: Comentar temporalmente esta sección para ejecutar crear_admin.php
-<DirectoryMatch "^.*/database/">
-    <FilesMatch "^(?!crear_admin\.php).*$">
-        Order Allow,Deny
-        Deny from all
-    </FilesMatch>
-</DirectoryMatch>
-
-# Prevenir listado de directorios
+# 2. Prevenir listado de directorios
 Options -Indexes
 
-# Configuración de PHP (si está permitido)
-<IfModule mod_php7.c>
-    php_value upload_max_filesize 5M
-    php_value post_max_size 5M
-    php_value max_execution_time 30
-    php_value max_input_time 30
-</IfModule>
-
-# Headers de seguridad
+# 3. Headers de Seguridad
 <IfModule mod_headers.c>
-    Header set X-Content-Type-Options "nosniff"
-    Header set X-Frame-Options "SAMEORIGIN"
-    Header set X-XSS-Protection "1; mode=block"
+    # Prevenir clickjacking
+    Header always set X-Frame-Options "SAMEORIGIN"
+    
+    # Prevenir MIME sniffing
+    Header always set X-Content-Type-Options "nosniff"
+    
+    # XSS Protection
+    Header always set X-XSS-Protection "1; mode=block"
+    
+    # CSP (Content Security Policy)
+    Header set Content-Security-Policy "default-src 'self' https:; script-src 'self' https: 'unsafe-inline' cdn.tailwindcss.com cdnjs.cloudflare.com; style-src 'self' https: 'unsafe-inline' cdn.tailwindcss.com; img-src 'self' data: https:; font-src 'self' data: https: cdnjs.cloudflare.com; connect-src 'self' https:;"
+    
+    # Referrer Policy
+    Header set Referrer-Policy "strict-origin-when-cross-origin"
 </IfModule>
 
-# Compresión GZIP (si está disponible)
+# 4. Comprensión GZIP para mejor rendimiento
 <IfModule mod_deflate.c>
     AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css text/javascript application/javascript application/json
 </IfModule>
 
+# 5. Caché del navegador para recursos estáticos
+<IfModule mod_expires.c>
+    ExpiresActive On
+    
+    # HTML
+    ExpiresByType text/html "access plus 1 hour"
+    
+    # Estilos y JavaScript
+    ExpiresByType text/css "access plus 30 days"
+    ExpiresByType application/javascript "access plus 30 days"
+    ExpiresByType application/json "access plus 0 seconds"
+    
+    # Imágenes
+    ExpiresByType image/jpeg "access plus 30 days"
+    ExpiresByType image/png "access plus 30 days"
+    ExpiresByType image/gif "access plus 30 days"
+    ExpiresByType image/svg+xml "access plus 30 days"
+    ExpiresByType image/x-icon "access plus 30 days"
+    
+    # Fuentes
+    ExpiresByType application/font-woff "access plus 30 days"
+    ExpiresByType application/font-woff2 "access plus 30 days"
+    ExpiresByType application/x-font-ttf "access plus 30 days"
+</IfModule>
+
+# 6. Permitir acceso a recursos públicos
+<FilesMatch "\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot|html)$">
+    <IfModule mod_expires.c>
+        ExpiresActive On
+        ExpiresDefault "access plus 30 days"
+    </IfModule>
+</FilesMatch>
