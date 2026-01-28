@@ -18,7 +18,7 @@ async function initApp() {
 
     if (!autenticado) {
         // Redirigir a login
-        window.location.href = '/Programa-Gestion-SDI/login.html';
+        window.location.href = 'login.html';
         return;
     }
 

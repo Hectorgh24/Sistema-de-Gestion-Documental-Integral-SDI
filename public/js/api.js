@@ -8,8 +8,39 @@
  * @version 2.0
  */
 
+function detectarBasePathDesdeScript() {
+    try {
+        const scriptActual = document.currentScript;
+        let src = scriptActual && scriptActual.src ? scriptActual.src : '';
+
+        if (!src) {
+            const candidato = document.querySelector('script[src*="/public/js/api.js"], script[src$="public/js/api.js"]');
+            src = candidato && candidato.src ? candidato.src : '';
+        }
+
+        if (!src) return '';
+
+        const pathname = new URL(src, window.location.origin).pathname;
+        const match = pathname.match(/^(.*)\/public\/js\/api\.js$/);
+        if (!match) return '';
+
+        return (match[1] || '').replace(/\/$/, '');
+    } catch (e) {
+        return '';
+    }
+}
+
+const basePathDetectado = detectarBasePathDesdeScript();
+
 const api = {
-    baseURL: '/Programa-Gestion-SDI/api',
+    basePath: basePathDetectado,
+    baseURL: null,
+
+    resolverRuta(rutaRelativa) {
+        const ruta = String(rutaRelativa || '').replace(/^\//, '');
+        const prefijo = this.basePath ? this.basePath : '';
+        return `${prefijo}/${ruta}`.replace(/\/\/+?/g, '/');
+    },
 
     /**
      * Función auxiliar para logging de errores
@@ -266,3 +297,16 @@ const api = {
         }
     }
 };
+
+api.baseURL = api.resolverRuta('api');
+
+if (typeof api.resolverRuta !== 'function') {
+    api.resolverRuta = function (rutaRelativa) {
+        const ruta = String(rutaRelativa || '').replace(/^\//, '');
+        const prefijo = this.basePath ? this.basePath : '';
+        return `${prefijo}/${ruta}`.replace(/\/\/+?/g, '/');
+    };
+}
+
+api.baseURL = typeof api.resolverRuta === 'function' ? api.resolverRuta('api') : (api.baseURL || '/api');
+window.api = api;

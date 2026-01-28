@@ -97,7 +97,7 @@ const auth = {
             
             // Redirigir después de un momento
             setTimeout(() => {
-                window.location.href = '/Programa-Gestion-SDI/login.html';
+                window.location.href = 'login.html';
             }, 1500);
             
             return resultado;
@@ -107,7 +107,7 @@ const auth = {
             this.usuario = null;
             // Redirigir de todas formas
             setTimeout(() => {
-                window.location.href = '/Programa-Gestion-SDI/login.html';
+                window.location.href = 'login.html';
             }, 1500);
             return {
                 success: false,

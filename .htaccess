@@ -3,13 +3,13 @@
 
 <IfModule mod_rewrite.c>
     RewriteEngine On
-    RewriteBase /Programa-Gestion-SDI/
     
     # No procesar archivos y directorios reales
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteCond %{REQUEST_FILENAME} !-d
     
     # Redirigir todas las rutas /api/* al router.php
+    RewriteRule ^api$ router.php [QSA,L]
     RewriteRule ^api/(.*)$ router.php [QSA,L]
 </IfModule>
 
@@ -21,7 +21,9 @@
 # Bloquear acceso a carpetas sensibles
 <IfModule mod_rewrite.c>
     # Bloquear acceso web directo solo a las carpetas críticas
-    RewriteRule ^(config|models|controllers|middleware|services|database)/ - [F,L]
+    RewriteRule ^(\.git|\.env) - [F,L]
+    RewriteRule ^(config|models|controllers|middleware|services|database|helpers|logs)/ - [F,L]
+    RewriteRule ^public/uploads/.*\.(php[0-9]?|phtml|phar)$ - [F,L]
 </IfModule>
 
 # 2. Prevenir listado de directorios
@@ -76,7 +78,7 @@ Options -Indexes
 </IfModule>
 
 # 6. Permitir acceso a recursos públicos
-<FilesMatch "\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot|html)$">
+<FilesMatch "\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$">
     <IfModule mod_expires.c>
         ExpiresActive On
         ExpiresDefault "access plus 30 days"

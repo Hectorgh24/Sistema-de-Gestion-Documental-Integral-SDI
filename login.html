@@ -227,11 +227,25 @@
     <div id="loginToastContainer" class="mt-4"></div>
 
     <!-- Scripts -->
-    <script src="/Programa-Gestion-SDI/public/js/api.js"></script>
-    <script src="/Programa-Gestion-SDI/public/js/auth.js"></script>
-    <script src="/Programa-Gestion-SDI/public/js/ui.js"></script>
+    <script src="public/js/api.js?v=20260127"></script>
+    <script src="public/js/auth.js?v=20260127"></script>
+    <script src="public/js/ui.js?v=20260127"></script>
 
     <script>
+        if (typeof window.api === 'undefined' && typeof api !== 'undefined') {
+            window.api = api;
+        }
+
+        if (typeof api !== 'undefined' && typeof api.resolverRuta !== 'function') {
+            api.basePath = api.basePath || window.location.pathname.replace(/\/[^\/]*$/, '');
+            api.resolverRuta = function (rutaRelativa) {
+                const ruta = String(rutaRelativa || '').replace(/^\//, '');
+                const prefijo = this.basePath ? this.basePath : '';
+                return `${prefijo}/${ruta}`.replace(/\/\/+?/g, '/');
+            };
+            api.baseURL = api.baseURL || api.resolverRuta('api');
+        }
+
         /**
          * Mostrar toast de login debajo del botón
          */
@@ -291,7 +305,7 @@
                 
                 if (autenticado) {
                     console.log('[LOGIN] Usuario ya autenticado, redirigiendo...');
-                    window.location.href = '/Programa-Gestion-SDI/index.html';
+                    window.location.href = 'index.html';
                 } else {
                     console.log('[LOGIN] Usuario no autenticado, mostrando formulario');
                 }
@@ -340,7 +354,7 @@
                     if (verificacion) {
                         mostrarToastLogin('Bienvenido a SDI', 'success');
                         setTimeout(() => {
-                            window.location.href = '/Programa-Gestion-SDI/index.html';
+                            window.location.href = 'index.html';
                         }, 500);
                     } else {
                         console.error('[LOGIN] Error: Login exitoso pero verificación falló');
